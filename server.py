@@ -197,7 +197,7 @@ async def handle_reply(request: Request):
         if any(k in text for k in [
             "ok", "yes", "do it", "go ahead", "lets do it"
         ]):
-            msg = safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?")
+            msg = safe_str("Great — I’ll set this up. I am proceeding with the confirmed offer now.")
             return {
                 "action": "send",
                 "body": msg,
