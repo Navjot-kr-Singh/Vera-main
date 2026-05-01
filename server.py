@@ -138,9 +138,18 @@ async def tick(data: Optional[TickRequest] = None):
         return {"actions": []}
 
 @app.post("/v1/reply")
-async def handle_reply(req: ReplyRequest):
+async def handle_reply(request: Request):
     try:
-        text = (req.message or "").lower()
+        body = await request.json()
+        
+        # Robust parsing of multiple possible fields
+        text = (
+            body.get("message") or 
+            body.get("reply") or 
+            body.get("text") or 
+            ""
+        )
+        text = str(text).lower().strip()
 
         # --------------------------
         # 1. AUTO-REPLY DETECTION

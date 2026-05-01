@@ -56,7 +56,7 @@
       },
       "offers": [],
       "conversation_history": [
-        { "ts": "2026-04-10T11:00:00Z", "from": "vera", "body": "Subscription expires in 16 days — Bharat Dental Care...", "engagement": "merchant_no_reply" }
+        { "ts": "2026-04-10T11:00:00Z", "from": "vera", "body": "Subscription expires in 16 days — Bharat Dental Care", "engagement": "merchant_no_reply" }
       ],
       "customer_aggregate": { "total_unique_ytd": 220, "lapsed_180d_plus": 95, "retention_6mo_pct": 0.18 },
       "signals": ["renewal_due_soon:12d", "perf_dip_severe", "unverified_gbp", "dormant_with_vera_14d", "no_active_offers"],
@@ -116,7 +116,7 @@
       },
       "offers": [],
       "conversation_history": [
-        { "ts": "2026-03-19T14:00:00Z", "from": "vera", "body": "Subscription expired. Profile maintenance paused...", "engagement": "merchant_no_reply" }
+        { "ts": "2026-03-19T14:00:00Z", "from": "vera", "body": "Subscription expired. Profile maintenance paused", "engagement": "merchant_no_reply" }
       ],
       "customer_aggregate": { "total_unique_ytd": 380, "lapsed_90d_plus": 180, "retention_3mo_pct": 0.32 },
       "signals": ["winback_eligible", "perf_dip_post_expiry", "dormant_with_vera_38d"],
