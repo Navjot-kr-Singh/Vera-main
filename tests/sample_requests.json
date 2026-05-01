@@ -1,0 +1,42 @@
+[
+  {
+    "description": "Restaurant weekend deal for an inactive user",
+    "request": {
+      "category": "restaurant",
+      "merchant_name": "Burger King",
+      "offer": "Buy 1 Get 1 Free",
+      "trigger": "weekend",
+      "customer_context": "inactive"
+    }
+  },
+  {
+    "description": "Salon trying to boost low sales on a weekday",
+    "request": {
+      "category": "salon",
+      "merchant_name": "Glow Spa",
+      "offer": "30% OFF all haircuts",
+      "trigger": "low sales",
+      "customer_context": "default"
+    }
+  },
+  {
+    "description": "Grocery store targeting loyal users on payday",
+    "request": {
+      "category": "grocery",
+      "merchant_name": "FreshMart",
+      "offer": "Flat ₹500 off on ₹2000",
+      "trigger": "payday",
+      "customer_context": "repeat"
+    }
+  },
+  {
+    "description": "Fashion brand running a festive offer for new users",
+    "request": {
+      "category": "fashion",
+      "merchant_name": "Zudio",
+      "offer": "Flat 50% OFF",
+      "trigger": "festival",
+      "customer_context": "new user"
+    }
+  }
+]

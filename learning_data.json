@@ -1,0 +1,22 @@
+{
+  "patterns": {
+    "restaurant|weekend": {
+      "category": "restaurant",
+      "trigger": "weekend",
+      "runs": 2,
+      "mode_wins": {
+        "retention": 1,
+        "aggressive": 1
+      }
+    },
+    "fashion|lunch time": {
+      "category": "fashion",
+      "trigger": "lunch time",
+      "runs": 1,
+      "mode_wins": {
+        "aggressive": 1
+      }
+    }
+  },
+  "total_runs": 3
+}
