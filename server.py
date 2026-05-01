@@ -156,10 +156,15 @@ async def handle_reply(request: Request):
         # -----------------------------
         # AUTO-REPLY DETECTION
         # -----------------------------
-        if any(k in text for k in [
+        auto_reply_keywords = [
             "busy", "meeting", "out of office", "away",
-            "call you later", "driving", "will get back"
-        ]):
+            "call you later", "driving", "will get back",
+            "unavailable", "not available", "cant talk",
+            "cannot talk", "later", "respond later",
+            "auto", "automatic reply"
+        ]
+
+        if any(k in text for k in auto_reply_keywords):
             return {"action": "end"}
 
         # -----------------------------
