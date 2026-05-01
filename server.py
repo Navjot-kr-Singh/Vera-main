@@ -186,13 +186,11 @@ async def handle_reply(request: Request):
         ]):
             response = {
                 "action": "send",
-                "body": {
-                    "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
-                    "cta": "Confirm",
-                    "send_as": "assistant",
-                    "suppression_key": "confirm_campaign",
-                    "rationale": "Merchant intent detected → moving to execution step"
-                }
+                "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
+                "cta": "Confirm",
+                "send_as": "assistant",
+                "suppression_key": "confirm_campaign",
+                "rationale": "Merchant intent detected → moving to execution step"
             }
 
         # -----------------------------
@@ -201,26 +199,12 @@ async def handle_reply(request: Request):
         else:
             response = {
                 "action": "send",
-                "body": {
-                    "message": safe_str("Let me refine this recommendation based on your business."),
-                    "cta": "Try this",
-                    "send_as": "assistant",
-                    "suppression_key": "refine",
-                    "rationale": "Fallback response"
-                }
+                "message": safe_str("Let me refine this recommendation based on your business."),
+                "cta": "Try this",
+                "send_as": "assistant",
+                "suppression_key": "refine",
+                "rationale": "Fallback response"
             }
-
-        # -----------------------------
-        # ADD FINAL SAFETY (VERY IMPORTANT)
-        # -----------------------------
-        if not isinstance(response, dict):
-            return {"action": "end"}
-
-        if response.get("action") == "send":
-            resp_body = response.get("body", {})
-            if not isinstance(resp_body.get("message"), str):
-                resp_body["message"] = str(resp_body.get("message") or "")
-            response["body"] = resp_body
 
         return response
 
