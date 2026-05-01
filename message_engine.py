@@ -84,13 +84,12 @@ class MessageCompositionEngine:
             if item:
                 title = item.get("title")
                 source = item.get("source")
-                n = item.get("trial_n", "some")
                 body = f"{salutation}, {source} just released data on '{title}'. Based on your {location} patient-mix, I've identified a lift opportunity. I've drafted a clinical update to position your practice as an authority. Shall I publish?"
-                cta = "Publish Update"
+                cta = f"Publish {source} Update"
                 rationale = f"Decisive clinical positioning based on {source} specificity."
             else:
                 body = f"{salutation}, new research on {category_slug} just dropped. I've analyzed the 2-min summary for your {location} practice. Shall I send the briefing?"
-                cta = "Send Briefing"
+                cta = "Send Research Briefing"
 
         elif kind == "regulation_change":
             item_id = payload.get("top_item_id")
@@ -101,30 +100,30 @@ class MessageCompositionEngine:
                 title = item.get("title")
                 source = item.get("source")
                 body = f"Compliance Alert: {source} has revised {title} effective {deadline}. I've flagged a potential gap in your {location} setup. I'm ready to audit your SOPs to ensure you meet the new {item.get('summary', '').split()[0]} limits. Shall I start?"
-                cta = "Start Audit"
+                cta = f"Audit My {category_slug.capitalize()[:-1] if category_slug.endswith('s') else category_slug.capitalize()}"
                 rationale = "Direct compliance advisor tone with clear next step."
 
         elif kind == "perf_dip":
             metric = payload.get("metric", "views")
             dip = abs(payload.get("delta_pct", 0) * 100)
-            window = payload.get("window", "7d")
             body = f"Visibility Alert: {m_name} is missing ~{dip:.0f}% of {location} searches. Your CTR ({ctr:.3f}) is trailing peers ({peer_ctr:.3f}). I'm ready to push your {active_offer} to regain your ranking. Shall I proceed?"
-            cta = "Regain Ranking"
+            cta = "Optimize Profile Ranking"
             rationale = f"Corrective advisor tone using peer benchmarking ({peer_ctr:.3f})."
 
         elif kind == "perf_spike" or kind == "search_surge":
             metric = payload.get("metric", "views")
             spike = abs(payload.get("delta_pct", 0) * 100)
-            if spike == 0: spike = 142 # Fallback
+            if spike == 0: spike = 142
             body = f"Demand Spike: I've detected a {spike:.0f}% surge in {location} searches for {category_slug}. I'm activating your {active_offer} to capture this intent before the window closes. Shall I go live?"
-            cta = f"Activate {active_offer.split('@')[-1].strip() if '@' in active_offer else 'Offer'}"
+            offer_action = active_offer.split('@')[-1].strip() if '@' in active_offer else active_offer
+            cta = f"Activate {offer_action} Offer"
             rationale = "Momentum exploitation with decisive CTA."
 
         elif kind == "festival_upcoming":
             festival = payload.get("festival", "upcoming peak")
             days = payload.get("days_until", 7)
             body = f"Peak Demand: {festival} is {days} days away. {location} intent is rising, but your profile is currently dormant. I'm launching your {active_offer} to capture this festive surge. Shall I proceed?"
-            cta = "Launch Festive Offer"
+            cta = f"Launch {festival} Offer"
             rationale = "Temporal urgency with proactive launch stance."
 
         elif kind == "milestone_reached":
@@ -132,26 +131,26 @@ class MessageCompositionEngine:
             val = payload.get("value_now")
             target = payload.get("milestone_value")
             body = f"Authority Boost: {m_name} is at {val} {metric} — just {target - val} away from the {target} milestone. I'm pushing a targeted review-nudge to bridge this gap today. Shall I send?"
-            cta = "Push Nudge"
+            cta = f"Hit {target} Milestone"
             rationale = "Decisive social proof reinforcement."
 
         elif kind == "gbp_unverified":
             uplift = payload.get("estimated_uplift_pct", 0.30) * 100
             body = f"Visibility Gap: {m_name} is losing ~{uplift:.0f}% of potential calls in {location} due to being unverified. I've mapped the fastest verification path for you. Shall I start the process?"
-            cta = "Verify Now"
+            cta = "Verify My Business"
             rationale = "Clear ROI advisor tone (30% uplift)."
 
         elif kind == "supply_alert":
             item = payload.get("molecule") or payload.get("item", "stock")
             mfr = payload.get("manufacturer", "the manufacturer")
             body = f"Safety Alert: {mfr} has issued a recall for {item}. I've identified your affected patients in {location}. I'm pulling the reach-out list now to ensure compliance. Ready to review?"
-            cta = "Review List"
+            cta = "Review Patient List"
             rationale = "High-authority safety advisor stance."
 
         elif kind == "active_planning_intent":
             topic = payload.get("intent_topic", "the update").replace("_", " ")
             body = f"Got it, {salutation}. I've drafted the {topic} strategy optimized for your {location} audience. I'm ready to push this to GBP to start driving leads. Shall we go live?"
-            cta = "Go Live"
+            cta = "Go Live with Strategy"
             rationale = "Intent-to-action handoff."
 
         else:
