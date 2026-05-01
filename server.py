@@ -139,60 +139,66 @@ async def tick(data: Optional[TickRequest] = None):
 
 @app.post("/v1/reply")
 async def handle_reply(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
 
-    # -----------------------------
-    # ROBUST TEXT EXTRACTION
-    # -----------------------------
-    text = (
-        body.get("message")
-        or body.get("reply")
-        or body.get("text")
-        or ""
-    ).lower()
+        # -----------------------------
+        # SAFE TEXT EXTRACTION
+        # -----------------------------
+        text = (
+            str(body.get("message") or "")
+            + " "
+            + str(body.get("reply") or "")
+            + " "
+            + str(body.get("text") or "")
+        ).lower()
 
-    # -----------------------------
-    # AUTO-REPLY DETECTION
-    # -----------------------------
-    if any(k in text for k in [
-        "busy", "meeting", "out of office", "away",
-        "call you later", "driving", "will get back"
-    ]):
-        return {"action": "end"}
+        # -----------------------------
+        # AUTO-REPLY DETECTION
+        # -----------------------------
+        if any(k in text for k in [
+            "busy", "meeting", "out of office", "away",
+            "call you later", "driving", "will get back"
+        ]):
+            return {"action": "end"}
 
-    # -----------------------------
-    # HOSTILE / STOP
-    # -----------------------------
-    if any(k in text for k in [
-        "stop", "spam", "useless", "not interested",
-        "don't message", "leave me"
-    ]):
-        return {"action": "end"}
+        # -----------------------------
+        # HOSTILE / STOP
+        # -----------------------------
+        if any(k in text for k in [
+            "stop", "spam", "useless", "not interested",
+            "don't message", "leave me"
+        ]):
+            return {"action": "end"}
 
-    # -----------------------------
-    # POSITIVE INTENT
-    # -----------------------------
-    if any(k in text for k in [
-        "ok", "yes", "do it", "go ahead", "lets do it"
-    ]):
+        # -----------------------------
+        # POSITIVE INTENT
+        # -----------------------------
+        if any(k in text for k in [
+            "ok", "yes", "do it", "go ahead", "lets do it"
+        ]):
+            return {
+                "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
+                "cta": "Confirm",
+                "send_as": "assistant",
+                "suppression_key": "confirm_campaign",
+                "rationale": "Merchant intent detected → moving to execution step"
+            }
+
+        # -----------------------------
+        # DEFAULT SAFE RESPONSE (NEVER EMPTY)
+        # -----------------------------
         return {
-            "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
-            "cta": "Confirm",
+            "message": "Let me refine this recommendation based on your business.",
+            "cta": "Try this",
             "send_as": "assistant",
-            "suppression_key": "confirm_campaign",
-            "rationale": "Merchant intent detected → moving to execution step"
+            "suppression_key": "refine",
+            "rationale": "Fallback response"
         }
 
-    # -----------------------------
-    # SAFE FALLBACK (NO )
-    # -----------------------------
-    return {
-        "message": "Let me refine this recommendation based on your business.",
-        "cta": "Try this",
-        "send_as": "assistant",
-        "suppression_key": "refine",
-        "rationale": "Fallback response"
-    }
+    except Exception as e:
+        # NEVER crash, NEVER return empty
+        return {"action": "end"}
 
 if __name__ == "__main__":
     import uvicorn
