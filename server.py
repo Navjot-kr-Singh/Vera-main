@@ -88,8 +88,12 @@ class TickRequest(BaseModel):
     now: Optional[str] = None
 
 class ReplyRequest(BaseModel):
-    reply: str
+    message: Optional[str] = ""
+    from_role: Optional[str] = "merchant"
     context: Optional[Dict[str, Any]] = None
+
+    class Config:
+        extra = "allow"
 
 @app.get("/v1/healthz")
 async def healthz():
@@ -134,26 +138,40 @@ async def tick(data: Optional[TickRequest] = None):
         return {"actions": []}
 
 @app.post("/v1/reply")
-async def handle_reply(data: ReplyRequest):
+async def handle_reply(req: ReplyRequest):
     try:
-        msg_lower = data.reply.lower().strip()
-        
-        # 🛑 FIX #1 & #2 — AUTO-REPLY & HOSTILE DETECTION
-        # Patterns that should immediately end the conversation
-        end_patterns = [
-            "busy", "in a meeting", "call you later", "out of office", "driving", 
-            "will get back", "auto reply", "stop", "don't message", "spam", 
-            "useless", "not interested", "later", "unsubscribed"
+        text = (req.message or "").lower()
+
+        # --------------------------
+        # 1. AUTO-REPLY DETECTION
+        # --------------------------
+        auto_reply_keywords = [
+            "busy", "meeting", "call you later", "out of office",
+            "driving", "will get back", "auto reply", "away"
         ]
-        
-        if any(pattern in msg_lower for pattern in end_patterns):
+
+        if any(k in text for k in auto_reply_keywords):
             return {"action": "end"}
-        
-        # 🚀 FIX #3 — INTENT DETECTION (ROBUST)
-        # Positive intent patterns
-        positive_intent = ["ok", "yes", "do it", "go ahead", "lets do it", "sounds good", "sure", "proceed"]
-        
-        if any(pattern in msg_lower for pattern in positive_intent):
+
+        # --------------------------
+        # 2. HOSTILE / STOP
+        # --------------------------
+        hostile_keywords = [
+            "stop", "don't message", "spam", "useless",
+            "not interested", "leave me", "remove me"
+        ]
+
+        if any(k in text for k in hostile_keywords):
+            return {"action": "end"}
+
+        # --------------------------
+        # 3. POSITIVE INTENT
+        # --------------------------
+        positive_keywords = [
+            "ok", "yes", "do it", "go ahead", "lets do it", "sounds good"
+        ]
+
+        if any(k in text for k in positive_keywords):
             return {
                 "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
                 "cta": "Confirm",
@@ -161,17 +179,17 @@ async def handle_reply(data: ReplyRequest):
                 "suppression_key": "confirm_campaign",
                 "rationale": "Merchant intent detected → moving to execution step"
             }
-        
-        # 🧠 FIX #5 — DEFAULT FALLBACK
-        # If no condition matches, return the safe fallback message
+
+        # --------------------------
+        # 4. DEFAULT SAFE RESPONSE
+        # --------------------------
         return {
             "message": "Let me refine this recommendation based on your business.",
             "cta": "Try this",
             "send_as": "assistant",
             "suppression_key": "refine",
-            "rationale": "Fallback response for unclear intent"
+            "rationale": "Fallback response"
         }
-        
     except Exception as e:
         return {"action": "end"}
 
