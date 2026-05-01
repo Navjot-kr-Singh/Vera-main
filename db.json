@@ -2320,7 +2320,18 @@
     }
   },
   "versions": {
-    "merchant:m1": 2
+    "merchant:m1": 2,
+    "category:dentists": 1,
+    "category:gyms": 1,
+    "category:salons": 1,
+    "category:pharmacies": 1,
+    "category:restaurants": 1,
+    "merchant:m_001_drmeera_dentist_delhi": 1,
+    "merchant:m_002_bharat_dentist_mumbai": 1,
+    "merchant:m_003_studio11_salon_hyderabad": 1,
+    "merchant:m_004_glamour_salon_pune": 1,
+    "merchant:m_005_pizzajunction_restaurant_delhi": 1
   },
-  "suppression": {}
+  "suppression": {},
+  "conversations": {}
 }

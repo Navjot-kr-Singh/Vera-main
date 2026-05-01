@@ -30,7 +30,7 @@ load_dotenv()
 BOT_URL = "http://localhost:8000"
 
 # Choose your LLM provider: "openai", "anthropic", "gemini", "deepseek", "groq", "ollama", "openrouter"
-LLM_PROVIDER = "openai"
+LLM_PROVIDER = "none"
 
 # Your API key (paste your key here)
 LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")  # <-- LOADED FROM .ENV
@@ -332,8 +332,11 @@ class OpenRouterProvider(LLMProvider):
         return data["choices"][0]["message"]["content"]
 
 
-def create_provider() -> LLMProvider:
+def create_provider() -> Optional[LLMProvider]:
     """Create LLM provider from configuration."""
+    if LLM_PROVIDER == "none":
+        return None
+
     providers = {
         "openai": lambda: OpenAIProvider(LLM_API_KEY, LLM_MODEL),
         "anthropic": lambda: AnthropicProvider(LLM_API_KEY, LLM_MODEL),
@@ -346,7 +349,7 @@ def create_provider() -> LLMProvider:
 
     if LLM_PROVIDER not in providers:
         print_fail(f"Unknown provider: {LLM_PROVIDER}")
-        print_info(f"Available: {', '.join(providers.keys())}")
+        print_info(f"Available: {', '.join(providers.keys())}, none")
         sys.exit(1)
 
     return providers[LLM_PROVIDER]()
@@ -601,7 +604,7 @@ Score each dimension 0-10 with clear reasoning. Be STRICT."""
 # =============================================================================
 
 class JudgeSimulator:
-    def __init__(self, llm: LLMProvider):
+    def __init__(self, llm: Optional[LLMProvider]):
         self.llm = llm
         self.client = BotClient(BOT_URL)
         self.dataset = DatasetLoader(DATASET_DIR)
@@ -611,9 +614,8 @@ class JudgeSimulator:
     def run(self, scenario: str) -> bool:
         print_header(f"LLM JUDGE — {scenario.upper()}")
         print_info(f"Bot: {BOT_URL}")
-        if not LLM_API_KEY:
-            print_warn("LLM_API_KEY not set. Using HEURISTIC FALLBACK scoring mode.")
-            self.llm = None
+        if not self.llm:
+            print_warn("LLM_PROVIDER set to 'none'. Using HEURISTIC FALLBACK scoring mode.")
         else:
             print_info(f"LLM: {self.llm.name()}")
 
@@ -949,10 +951,9 @@ def main():
     if LLM_PROVIDER != "ollama" and not LLM_API_KEY:
         print_warn("LLM_API_KEY is not set. Will use heuristic scoring only.")
 
-    llm = None
-    if LLM_API_KEY:
+    llm = create_provider()
+    if llm:
         try:
-            llm = create_provider()
             print_info(f"LLM Provider: {llm.name()}")
             # Test LLM connection
             print_info("Testing LLM connection...")
@@ -967,7 +968,7 @@ def main():
             print_info("Check your API key and internet connection")
             sys.exit(1)
     else:
-        print_warn("No LLM_API_KEY provided. Skipping LLM connection test.")
+        print_warn("No LLM provider configured. Skipping LLM connection test.")
 
     # Run the judge
     judge = JudgeSimulator(llm)
