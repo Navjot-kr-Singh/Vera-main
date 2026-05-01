@@ -2,7 +2,11 @@ import json
 import os
 from typing import Dict, Any, Optional
 
-DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
+# Use /tmp for persistence on Vercel
+if os.environ.get("VERCEL"):
+    DB_FILE = "/tmp/db.json"
+else:
+    DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
 
 class StateManager:
     """
@@ -15,6 +19,8 @@ class StateManager:
             self.data["versions"] = {}
         if "suppression" not in self.data:
             self.data["suppression"] = {} # key: (merchant_id or customer_id), value: last_intent
+        if "conversations" not in self.data:
+            self.data["conversations"] = {} # key: conv_id, value: list of messages
 
     def _load(self):
         if os.path.exists(DB_FILE):
@@ -40,24 +46,37 @@ class StateManager:
         """
         Idempotent: same version = no-op. Higher version replaces.
         """
-        v_key = f"{scope}:{context_id}"
-        current_v = self.data["versions"].get(v_key, -1)
+        try:
+            v_key = f"{scope}:{context_id}"
+            current_v = self.data["versions"].get(v_key, -1)
 
-        if version <= current_v:
-            return False # No-op
+            if version <= current_v:
+                return False # No-op
 
-        if scope == "category":
-            self.data["categories"][context_id] = payload
-        elif scope == "merchant":
-            self.data["merchants"][context_id] = payload
-        elif scope == "customer":
-            self.data["customers"][context_id] = payload
-        elif scope == "trigger":
-            self.data["triggers"][context_id] = payload
-        
-        self.data["versions"][v_key] = version
-        self.save()
-        return True
+            if scope == "category":
+                self.data["categories"][context_id] = payload
+            elif scope == "merchant":
+                # Ensure merchant_id is consistent
+                mid = payload.get("merchant_id", context_id)
+                self.data["merchants"][mid] = payload
+            elif scope == "customer":
+                cid = payload.get("customer_id", context_id)
+                self.data["customers"][cid] = payload
+            elif scope == "trigger":
+                tid = payload.get("id", context_id)
+                self.data["triggers"][tid] = payload
+            else:
+                # Generic scope handling
+                if scope + "s" not in self.data:
+                    self.data[scope + "s"] = {}
+                self.data[scope + "s"][context_id] = payload
+            
+            self.data["versions"][v_key] = version
+            self.save()
+            return True
+        except Exception as e:
+            print(f"Upsert error: {e}")
+            raise e
 
     def get_category(self, slug):
         return self.data["categories"].get(slug, {})
@@ -100,3 +119,29 @@ class StateManager:
         if key in self.data["suppression"]:
             del self.data["suppression"][key]
             self.save()
+
+    def record_message(self, conv_id: str, message: str):
+        if conv_id not in self.data["conversations"]:
+            self.data["conversations"][conv_id] = []
+        self.data["conversations"][conv_id].append({
+            "message": message,
+            "timestamp": time.time()
+        })
+        # Keep only last 10 messages
+        self.data["conversations"][conv_id] = self.data["conversations"][conv_id][-10:]
+        self.save()
+
+    def is_auto_reply(self, conv_id: str, message: str) -> bool:
+        history = self.data["conversations"].get(conv_id, [])
+        if len(history) < 2:
+            return False
+        
+        # Check if the same message was sent 3 times in a row
+        consecutive_count = 0
+        for item in reversed(history):
+            if item["message"] == message:
+                consecutive_count += 1
+            else:
+                break
+        
+        return consecutive_count >= 3

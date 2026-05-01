@@ -81,14 +81,20 @@ class ContextPayload(BaseModel):
     context_id: str
     version: int
     payload: Dict[str, Any]
+    delivered_at: Optional[str] = None
 
 class TickRequest(BaseModel):
     available_triggers: List[str]
+    now: Optional[str] = None
 
 class ReplyRequest(BaseModel):
+    conversation_id: str
     merchant_id: str
+    customer_id: Optional[str] = None
+    from_role: str
     message: str
-    context_id: Optional[str] = None
+    received_at: Optional[str] = None
+    turn_number: Optional[int] = None
 
 @app.get("/v1/healthz")
 async def healthz():
@@ -126,16 +132,22 @@ async def tick(data: TickRequest):
             merchant = state.get_merchant(mid)
             if not merchant: continue
             
-            # GAP ANALYSIS Check
-            demand = t_payload.get("search_count", 0)
-            conversion = merchant.get("performance", {}).get("conversion_rate", 0.05)
-            gap_score = demand * (1 - conversion)
-            
-            if gap_score < threshold:
-                continue # Opportunity too small
-            
+            # Proactive Engagement Logic
+            # We skip gap analysis for external news/festivals as they are inherently valuable
+            is_functional = trigger.get("kind") in ["perf_dip", "perf_spike", "search_surge"]
+            if is_functional:
+                demand = t_payload.get("search_count", 0)
+                if demand == 0: demand = t_payload.get("views", 0)
+                
+                conversion = merchant.get("performance", {}).get("conversion_rate", 0.05)
+                gap_score = demand * (1 - conversion)
+                
+                if gap_score < 10.0: # Much lower threshold
+                    continue 
+
             cat_slug = merchant.get("category_slug", "default")
-            customer = None # In a real scenario, we'd lookup customer context if present
+            customer_id = t_payload.get("customer_id")
+            customer = state.get_customer(customer_id) if customer_id else None
             
             composition = engine.compose(cat_slug, merchant, trigger, customer)
             
@@ -151,29 +163,42 @@ async def tick(data: TickRequest):
             state.update_suppression(mid, supp_key)
             actions.append({
                 "trigger_id": tid,
-                **composition
+                "body": composition.get("body", composition.get("message", "")),
+                "cta": composition.get("cta", ""),
+                "send_as": composition.get("send_as", "vera"),
+                "suppression_key": supp_key,
+                "rationale": composition.get("rationale", "")
             })
             
         return {"actions": actions}
     except Exception as e:
+        import traceback
         print(f"Tick error: {e}")
+        traceback.print_exc()
         return {"actions": []}
 
 @app.post("/v1/reply")
 async def handle_reply(data: ReplyRequest):
     try:
         msg_lower = data.message.lower()
-        
+        conv_id = data.conversation_id
+        mid = data.merchant_id
+
+        # Record message and check for auto-reply
+        state.record_message(conv_id, data.message)
+        if state.is_auto_reply(conv_id, data.message):
+            return {"action": "end", "rationale": "Auto-reply pattern detected (repeated message)."}
+
         # 1. STOP Logic
-        stop_words = ["stop", "not interested", "later", "busy", "out of office"]
+        stop_words = ["stop", "not interested", "later", "busy", "out of office", "don't message", "unsubscribed"]
         if any(word in msg_lower for word in stop_words):
-            return {"action": "end"}
+            return {"action": "end", "rationale": "Merchant expressed non-interest or requested to stop."}
         
         # 2. Decision logic for positive/neutral replies
-        merchant = state.get_merchant(data.merchant_id)
-        if not merchant: return {"action": "end"}
+        merchant = state.get_merchant(mid)
+        if not merchant: 
+            return {"action": "end", "rationale": "Merchant context not found."}
             
-        # Recompute best strategy
         cat_slug = merchant.get("category_slug", "default")
         # Mocking a trigger for the reply context
         mock_trigger = {"kind": "reply_engagement", "payload": {"search_count": 100, "keyword": cat_slug}}
@@ -181,23 +206,28 @@ async def handle_reply(data: ReplyRequest):
         composition = engine.compose(cat_slug, merchant, mock_trigger)
         
         # If it's a strongly positive reply, we could "confirm"
-        if any(w in msg_lower for w in ["yes", "ok", "sure", "proceed", "run"]):
+        if any(w in msg_lower for w in ["yes", "ok", "sure", "proceed", "run", "do it", "go ahead"]):
             return {
                 "action": "send",
-                "message": f"Great! I'm launching the {composition['message'].split(' can ')[0]} campaign now. You'll see updates on your dashboard.",
+                "body": f"Great! I'm launching the campaign for {merchant.get('identity', {}).get('name', 'your clinic')} now. You'll see updates on your dashboard shortly.",
                 "cta": "View Dashboard",
+                "send_as": "vera",
                 "rationale": "Merchant confirmed action. Initializing campaign sequence."
             }
         
         # Otherwise re-engage with next best action
+        body = composition.get("body", composition.get("message", ""))
         return {
             "action": "send",
-            "message": f"I understand. We're seeing high local demand ({mock_trigger['payload']['search_count']} searches). Would you like to {composition['message'].split(' capture ')[1]}",
-            "cta": composition["cta"],
+            "body": body,
+            "cta": composition.get("cta", ""),
+            "send_as": "vera",
             "rationale": "Re-evaluating based on merchant engagement. Emphasizing demand specificity."
         }
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"action": "end", "rationale": str(e)}
 
 if __name__ == "__main__":

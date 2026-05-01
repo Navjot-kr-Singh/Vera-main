@@ -20,6 +20,12 @@ Author: magicpin AI Challenge Team
 # ██████  CONFIGURATION - EDIT THIS SECTION ██████
 # =============================================================================
 
+import os
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
+from dotenv import load_dotenv
+load_dotenv()
+
 # Your bot's URL (where your bot is running)
 BOT_URL = "http://localhost:8000"
 
@@ -27,16 +33,16 @@ BOT_URL = "http://localhost:8000"
 LLM_PROVIDER = "openai"
 
 # Your API key (paste your key here)
-LLM_API_KEY = ""  # <-- PUT YOUR API KEY HERE
+LLM_API_KEY = os.getenv("OPENAI_API_KEY", "")  # <-- LOADED FROM .ENV
 
 # Model to use (leave empty for default, or specify like "gpt-4o", "claude-3-5-sonnet-20241022", etc.)
-LLM_MODEL = ""  # <-- Optional: specify model or leave empty for default
+LLM_MODEL = "gpt-4o-mini"  # <-- Use a high-quality model for judging
 
 # For Ollama only: local server URL
 OLLAMA_URL = "http://localhost:11434"
 
 # Which test to run: "warmup", "phase2_short", "auto_reply_hell", "intent_transition", "hostile", "all", "full_evaluation"
-TEST_SCENARIO = "full_evaluation"
+TEST_SCENARIO = "all"
 
 # =============================================================================
 # ██████  END OF CONFIGURATION - DON'T EDIT BELOW THIS LINE ██████
