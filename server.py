@@ -175,7 +175,8 @@ async def handle_reply(request: Request):
             "unavailable", "not available", "later",
             "auto", "automatic", "respond later",
             "cant talk", "cannot talk", "right now",
-            "in a call", "occupied"
+            "in a call", "occupied", "shortly",
+            "contacting us", "team will"
         ]
 
         if any(k in text for k in auto_reply_keywords):
@@ -198,11 +199,13 @@ async def handle_reply(request: Request):
         ]):
             return {
                 "action": "send",
-                "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
-                "cta": "Confirm",
-                "send_as": "assistant",
-                "suppression_key": "confirm_campaign",
-                "rationale": "Merchant intent detected → moving to execution step"
+                "body": {
+                    "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
+                    "cta": "Confirm",
+                    "send_as": "assistant",
+                    "suppression_key": "confirm_campaign",
+                    "rationale": "Merchant intent detected → moving to execution step"
+                }
             }
 
         # -----------------------------
@@ -210,11 +213,13 @@ async def handle_reply(request: Request):
         # -----------------------------
         return {
             "action": "send",
-            "message": safe_str("Let me refine this recommendation based on your business."),
-            "cta": "Try this",
-            "send_as": "assistant",
-            "suppression_key": "refine",
-            "rationale": "Fallback response"
+            "body": {
+                "message": safe_str("Let me refine this recommendation based on your business."),
+                "cta": "Try this",
+                "send_as": "assistant",
+                "suppression_key": "refine",
+                "rationale": "Fallback response"
+            }
         }
 
     except Exception as e:

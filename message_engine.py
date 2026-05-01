@@ -100,10 +100,12 @@ class MessageCompositionEngine:
 
         return {
             "action": "send",
-            "message": body,
-            "cta": cta,
-            "send_as": "assistant",
-            "rationale": rationale
+            "body": {
+                "message": body,
+                "cta": cta,
+                "send_as": "assistant",
+                "rationale": rationale
+            }
         }
 
     def _compose_customer_facing(self, category_slug: str, merchant: Dict[str, Any], trigger: Dict[str, Any], customer: Dict[str, Any]) -> Dict[str, Any]:
@@ -141,10 +143,12 @@ class MessageCompositionEngine:
         name = merchant.get("identity", {}).get("name", "there")
         return {
             "action": "send",
-            "message": f"Hi {name}, I noticed a growth opportunity for your business. Want to see the details?",
-            "cta": "See Details",
-            "send_as": "assistant",
-            "rationale": "Safe fallback triggered due to unexpected error."
+            "body": {
+                "message": f"Hi {name}, I noticed a growth opportunity for your business. Want to see the details?",
+                "cta": "See Details",
+                "send_as": "assistant",
+                "rationale": "Safe fallback triggered due to unexpected error."
+            }
         }
 
     def generate_variations(self, category: str, merchant_name: str, offer: str, trigger: str, customer_context: str = "", tone_style: str = "default") -> Dict[str, Any]:
@@ -173,8 +177,8 @@ class MessageCompositionEngine:
                 {
                     "mode_id": "v2_deterministic",
                     "mode_name": "Smart Decision Engine v2",
-                    "message": res.get("message"),
-                    "reasoning": res.get("rationale"),
+                    "message": res.get("body", {}).get("message"),
+                    "reasoning": res.get("body", {}).get("rationale"),
                     "tags": ["Insight-Driven", "High Conversion", "Business Aware"],
                     "confidence_score": 98,
                     "expected_ctr": "10.5%",
