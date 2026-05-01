@@ -197,29 +197,29 @@ async def handle_reply(request: Request):
         if any(k in text for k in [
             "ok", "yes", "do it", "go ahead", "lets do it"
         ]):
+            msg = safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?")
             return {
                 "action": "send",
-                "body": {
-                    "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
-                    "cta": "Confirm",
-                    "send_as": "assistant",
-                    "suppression_key": "confirm_campaign",
-                    "rationale": "Merchant intent detected → moving to execution step"
-                }
+                "body": msg,
+                "message": msg,
+                "cta": "Confirm",
+                "send_as": "assistant",
+                "suppression_key": "confirm_campaign",
+                "rationale": "Merchant intent detected → moving to execution step"
             }
 
         # -----------------------------
         # FALLBACK (ALWAYS RETURN)
         # -----------------------------
+        fallback_msg = safe_str("Let me refine this recommendation based on your business.")
         return {
             "action": "send",
-            "body": {
-                "message": safe_str("Let me refine this recommendation based on your business."),
-                "cta": "Try this",
-                "send_as": "assistant",
-                "suppression_key": "refine",
-                "rationale": "Fallback response"
-            }
+            "body": fallback_msg,
+            "message": fallback_msg,
+            "cta": "Try this",
+            "send_as": "assistant",
+            "suppression_key": "refine",
+            "rationale": "Fallback response"
         }
 
     except Exception as e:
