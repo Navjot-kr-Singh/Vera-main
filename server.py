@@ -159,8 +159,7 @@ async def handle_reply(request: Request):
         auto_reply_keywords = [
             "busy", "meeting", "out of office", "away",
             "call you later", "driving", "will get back",
-            "unavailable", "not available", "cant talk",
-            "cannot talk", "later", "respond later",
+            "unavailable", "not available", "later",
             "auto", "automatic reply"
         ]
 
@@ -168,12 +167,14 @@ async def handle_reply(request: Request):
             return {"action": "end"}
 
         # -----------------------------
-        # HOSTILE / STOP
+        # HOSTILE
         # -----------------------------
-        if any(k in text for k in [
+        hostile_keywords = [
             "stop", "spam", "useless", "not interested",
             "don't message", "leave me"
-        ]):
+        ]
+
+        if any(k in text for k in hostile_keywords):
             return {"action": "end"}
 
         # -----------------------------
@@ -191,7 +192,7 @@ async def handle_reply(request: Request):
             }
 
         # -----------------------------
-        # DEFAULT SAFE RESPONSE (NEVER EMPTY)
+        # FALLBACK (ALWAYS RETURN)
         # -----------------------------
         return {
             "message": "Let me refine this recommendation based on your business.",
@@ -202,7 +203,7 @@ async def handle_reply(request: Request):
         }
 
     except Exception as e:
-        # NEVER crash, NEVER return empty
+        # ABSOLUTE SAFETY NET
         return {"action": "end"}
 
 if __name__ == "__main__":
