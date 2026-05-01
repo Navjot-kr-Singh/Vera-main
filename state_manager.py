@@ -144,20 +144,21 @@ class StateManager:
         
         self.save()
 
-    def is_auto_reply(self, mid: str, message: str) -> bool:
+    def get_auto_reply_streak(self, mid: str, message: str) -> int:
         history = self.data["merchant_history"].get(mid, [])
-        if len(history) < 3:
-            return False
-        
-        # Check if the same message was sent 3 times recently (global for merchant)
-        consecutive_count = 0
+        streak = 0
         for item in reversed(history):
             if item["message"] == message:
-                consecutive_count += 1
+                streak += 1
             else:
-                # We allow for interleaved messages if they are identical overall
-                pass
+                break
+        return streak
+
+    def is_auto_reply(self, mid: str, message: str) -> bool:
+        history = self.data["merchant_history"].get(mid, [])
+        if not history:
+            return False
         
-        # If the same message appears 3 times in last 5 messages, it's an auto-reply
+        # If the same message appears 2+ times in last 5 messages, it's likely an auto-reply
         count = sum(1 for item in history[-5:] if item["message"] == message)
-        return count >= 3
+        return count >= 2

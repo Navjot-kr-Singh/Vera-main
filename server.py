@@ -125,15 +125,49 @@ async def push_context(data: Dict[str, Any]):
 @app.post("/v1/tick")
 async def tick(data: Optional[TickRequest] = None):
     try:
-        # Static response as per judge contract requirement
-        return {
-            "actions": [
-                {
-                    "type": "engage",
-                    "reason": "high_demand_detected"
-                }
-            ]
-        }
+        if not data or not data.available_triggers:
+            return {"actions": []}
+        
+        actions = []
+        for tid in data.available_triggers:
+            trigger = state.get_trigger(tid)
+            if not trigger:
+                continue
+            
+            mid = trigger.get("merchant_id") or trigger.get("payload", {}).get("merchant_id")
+            if not mid:
+                continue
+            
+            merchant = state.get_merchant(mid)
+            if not merchant:
+                continue
+            
+            category_slug = merchant.get("category_slug")
+            if not category_slug:
+                continue
+            
+            customer_id = trigger.get("customer_id")
+            customer = state.get_customer(customer_id) if customer_id else None
+            
+            # Compose message
+            category = state.get_category(category_slug)
+            res = engine.compose(category, merchant, trigger, customer)
+            
+            # Action schema
+            action = {
+                "type": "engage",
+                "merchant_id": mid,
+                "trigger_id": tid,
+                "body": res.get("body"),
+                "message": res.get("body"), 
+                "cta": res.get("cta"),
+                "send_as": res.get("send_as", "vera"),
+                "suppression_key": res.get("suppression_key"),
+                "rationale": res.get("rationale")
+            }
+            actions.append(action)
+            
+        return {"actions": actions}
     except Exception as e:
         return {"actions": []}
 
@@ -144,6 +178,8 @@ def safe_str(x):
 async def handle_reply(request: Request):
     try:
         body = await request.json()
+        mid = body.get("merchant_id", "m_unknown")
+        conv_id = body.get("conversation_id", "c_unknown")
 
         # -----------------------------
         # ROBUST TEXT EXTRACTION
@@ -158,16 +194,19 @@ async def handle_reply(request: Request):
             + str(body.get("reply") or "")
             + " "
             + str(body.get("text") or "")
-        ).lower()
+        ).lower().strip()
+
+        # Record message for auto-reply detection
+        state.record_message(mid, conv_id, text)
 
         # -----------------------------
         # SAFETY / EMPTY CHECK
         # -----------------------------
-        if not text.strip():
+        if not text:
             return {"action": "end"}
 
         # -----------------------------
-        # AUTO-REPLY DETECTION
+        # AUTO-REPLY DETECTION (WAIT THEN END)
         # -----------------------------
         auto_reply_keywords = [
             "busy", "meeting", "out of office", "away",
@@ -176,11 +215,17 @@ async def handle_reply(request: Request):
             "auto", "automatic", "respond later",
             "cant talk", "cannot talk", "right now",
             "in a call", "occupied", "shortly",
-            "contacting us", "team will"
+            "contacting us", "team will", "automated assistant"
         ]
 
-        if any(k in text for k in auto_reply_keywords):
-            return {"action": "end"}
+        is_keyword_match = any(k in text for k in auto_reply_keywords)
+        streak = state.get_auto_reply_streak(mid, text)
+
+        if is_keyword_match or state.is_auto_reply(mid, text):
+            if streak >= 2:
+                return {"action": "end"}
+            else:
+                return {"action": "wait", "wait_seconds": 60}
 
         # -----------------------------
         # HOSTILE
@@ -195,9 +240,9 @@ async def handle_reply(request: Request):
         # POSITIVE INTENT
         # -----------------------------
         if any(k in text for k in [
-            "ok", "yes", "do it", "go ahead", "lets do it"
+            "ok", "yes", "do it", "go ahead", "lets do it", "proceed", "agree"
         ]):
-            msg = safe_str("Great — I’ll set this up. I am proceeding with the confirmed offer now.")
+            msg = safe_str("Great — I’ll set this up. I am proceeding with the confirmed update for your business now.")
             return {
                 "action": "send",
                 "body": msg,
@@ -209,17 +254,32 @@ async def handle_reply(request: Request):
             }
 
         # -----------------------------
-        # FALLBACK (ALWAYS RETURN)
+        # ECHOING FALLBACK
         # -----------------------------
-        fallback_msg = safe_str("Let me refine this recommendation based on your business.")
+        echo_word = ""
+        # Technical or specific words are better
+        words = [w.strip("?,.!") for w in text.split()]
+        specific_words = [w for w in words if len(w) > 3 and w not in auto_reply_keywords and w not in [
+            "hello", "there", "please", "thanks", "thank", " Vera", "vera", "assistant"
+        ]]
+        
+        if specific_words:
+            # Try to find a very specific word (e.g. capitalized in original, or long)
+            echo_word = max(specific_words, key=len)
+        
+        if echo_word:
+            fallback_msg = safe_str(f"I understand your interest in {echo_word}. Let me refine this recommendation based on your business profile.")
+        else:
+            fallback_msg = safe_str("Let me refine this recommendation based on your business profile.")
+
         return {
             "action": "send",
             "body": fallback_msg,
             "message": fallback_msg,
-            "cta": "Try this",
+            "cta": "See Details",
             "send_as": "assistant",
             "suppression_key": "refine",
-            "rationale": "Fallback response"
+            "rationale": "Context-aware fallback response"
         }
 
     except Exception as e:
