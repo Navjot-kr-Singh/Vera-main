@@ -99,6 +99,7 @@ class MessageCompositionEngine:
             rationale = f"Conversion optimization (CRO) focus. Improving yield from existing view volume ({views})."
 
         return {
+            "action": "send",
             "body": body,
             "cta": cta,
             "send_as": "assistant",
@@ -127,6 +128,7 @@ class MessageCompositionEngine:
             rationale = "Generic customer re-engagement."
 
         return {
+            "action": "send",
             "body": body,
             "cta": cta,
             "send_as": "assistant",
@@ -136,6 +138,7 @@ class MessageCompositionEngine:
     def _fallback_message(self, merchant: Dict[str, Any]) -> Dict[str, Any]:
         name = merchant.get("identity", {}).get("name", "there")
         return {
+            "action": "send",
             "body": f"Hi {name}, I noticed a growth opportunity for your business. Want to see the details?",
             "cta": "See Details",
             "send_as": "assistant",

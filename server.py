@@ -184,6 +184,7 @@ async def handle_reply(request: Request):
             "ok", "yes", "do it", "go ahead", "lets do it"
         ]):
             return {
+                "action": "send",
                 "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
                 "cta": "Confirm",
                 "send_as": "assistant",
@@ -195,6 +196,7 @@ async def handle_reply(request: Request):
         # FALLBACK (ALWAYS RETURN)
         # -----------------------------
         return {
+            "action": "send",
             "message": "Let me refine this recommendation based on your business.",
             "cta": "Try this",
             "send_as": "assistant",
