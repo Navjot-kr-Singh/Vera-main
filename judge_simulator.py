@@ -27,7 +27,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Your bot's URL (where your bot is running)
-BOT_URL = "http://0.0.0.0:8000"
+BOT_URL = "https://vera-main.vercel.app"
 
 # Choose your LLM provider: "openai", "anthropic", "gemini", "deepseek", "groq", "ollama", "openrouter"
 LLM_PROVIDER = "none"
