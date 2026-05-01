@@ -101,7 +101,7 @@ class MessageCompositionEngine:
         return {
             "body": body,
             "cta": cta,
-            "send_as": "vera",
+            "send_as": "assistant",
             "rationale": rationale
         }
 
@@ -129,7 +129,7 @@ class MessageCompositionEngine:
         return {
             "body": body,
             "cta": cta,
-            "send_as": "merchant_on_behalf",
+            "send_as": "assistant",
             "rationale": rationale
         }
 
@@ -138,7 +138,7 @@ class MessageCompositionEngine:
         return {
             "body": f"Hi {name}, I noticed a growth opportunity for your business. Want to see the details?",
             "cta": "See Details",
-            "send_as": "vera",
+            "send_as": "assistant",
             "rationale": "Safe fallback triggered due to unexpected error."
         }
 
