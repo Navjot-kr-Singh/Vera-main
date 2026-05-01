@@ -185,11 +185,13 @@ async def handle_reply(request: Request):
         ]):
             return {
                 "action": "send",
-                "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
-                "cta": "Confirm",
-                "send_as": "assistant",
-                "suppression_key": "confirm_campaign",
-                "rationale": "Merchant intent detected → moving to execution step"
+                "body": {
+                    "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
+                    "cta": "Confirm",
+                    "send_as": "assistant",
+                    "suppression_key": "confirm_campaign",
+                    "rationale": "Merchant intent detected → moving to execution step"
+                }
             }
 
         # -----------------------------
@@ -197,11 +199,13 @@ async def handle_reply(request: Request):
         # -----------------------------
         return {
             "action": "send",
-            "message": "Let me refine this recommendation based on your business.",
-            "cta": "Try this",
-            "send_as": "assistant",
-            "suppression_key": "refine",
-            "rationale": "Fallback response"
+            "body": {
+                "message": "Let me refine this recommendation based on your business.",
+                "cta": "Try this",
+                "send_as": "assistant",
+                "suppression_key": "refine",
+                "rationale": "Fallback response"
+            }
         }
 
     except Exception as e:
