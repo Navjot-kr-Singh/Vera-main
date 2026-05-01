@@ -146,15 +146,25 @@ async def handle_reply(request: Request):
         body = await request.json()
 
         # -----------------------------
-        # SAFE TEXT EXTRACTION
+        # ROBUST TEXT EXTRACTION
         # -----------------------------
+        raw_msg = body.get("message")
+        if isinstance(raw_msg, dict):
+            raw_msg = raw_msg.get("text", "")
+
         text = (
-            str(body.get("message") or "")
+            str(raw_msg or "")
             + " "
             + str(body.get("reply") or "")
             + " "
             + str(body.get("text") or "")
         ).lower()
+
+        # -----------------------------
+        # SAFETY / EMPTY CHECK
+        # -----------------------------
+        if not text.strip():
+            return {"action": "end"}
 
         # -----------------------------
         # AUTO-REPLY DETECTION
@@ -163,28 +173,30 @@ async def handle_reply(request: Request):
             "busy", "meeting", "out of office", "away",
             "call you later", "driving", "will get back",
             "unavailable", "not available", "later",
-            "auto", "automatic reply"
+            "auto", "automatic", "respond later",
+            "cant talk", "cannot talk", "right now",
+            "in a call", "occupied"
         ]
 
         if any(k in text for k in auto_reply_keywords):
-            response = {"action": "end"}
-        
+            return {"action": "end"}
+
         # -----------------------------
         # HOSTILE
         # -----------------------------
-        elif any(k in text for k in [
+        if any(k in text for k in [
             "stop", "spam", "useless", "not interested",
             "don't message", "leave me"
         ]):
-            response = {"action": "end"}
+            return {"action": "end"}
 
         # -----------------------------
         # POSITIVE INTENT
         # -----------------------------
-        elif any(k in text for k in [
+        if any(k in text for k in [
             "ok", "yes", "do it", "go ahead", "lets do it"
         ]):
-            response = {
+            return {
                 "action": "send",
                 "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
                 "cta": "Confirm",
@@ -196,17 +208,14 @@ async def handle_reply(request: Request):
         # -----------------------------
         # FALLBACK (ALWAYS RETURN)
         # -----------------------------
-        else:
-            response = {
-                "action": "send",
-                "message": safe_str("Let me refine this recommendation based on your business."),
-                "cta": "Try this",
-                "send_as": "assistant",
-                "suppression_key": "refine",
-                "rationale": "Fallback response"
-            }
-
-        return response
+        return {
+            "action": "send",
+            "message": safe_str("Let me refine this recommendation based on your business."),
+            "cta": "Try this",
+            "send_as": "assistant",
+            "suppression_key": "refine",
+            "rationale": "Fallback response"
+        }
 
     except Exception as e:
         # ABSOLUTE SAFETY NET
