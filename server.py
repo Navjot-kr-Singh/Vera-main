@@ -137,6 +137,9 @@ async def tick(data: Optional[TickRequest] = None):
     except Exception as e:
         return {"actions": []}
 
+def safe_str(x):
+    return str(x) if x is not None else ""
+
 @app.post("/v1/reply")
 async def handle_reply(request: Request):
     try:
@@ -164,29 +167,27 @@ async def handle_reply(request: Request):
         ]
 
         if any(k in text for k in auto_reply_keywords):
-            return {"action": "end"}
-
+            response = {"action": "end"}
+        
         # -----------------------------
         # HOSTILE
         # -----------------------------
-        hostile_keywords = [
+        elif any(k in text for k in [
             "stop", "spam", "useless", "not interested",
             "don't message", "leave me"
-        ]
-
-        if any(k in text for k in hostile_keywords):
-            return {"action": "end"}
+        ]):
+            response = {"action": "end"}
 
         # -----------------------------
         # POSITIVE INTENT
         # -----------------------------
-        if any(k in text for k in [
+        elif any(k in text for k in [
             "ok", "yes", "do it", "go ahead", "lets do it"
         ]):
-            return {
+            response = {
                 "action": "send",
                 "body": {
-                    "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
+                    "message": safe_str("Great — I’ll set this up. Do you want to proceed with the selected offer today?"),
                     "cta": "Confirm",
                     "send_as": "assistant",
                     "suppression_key": "confirm_campaign",
@@ -197,16 +198,31 @@ async def handle_reply(request: Request):
         # -----------------------------
         # FALLBACK (ALWAYS RETURN)
         # -----------------------------
-        return {
-            "action": "send",
-            "body": {
-                "message": "Let me refine this recommendation based on your business.",
-                "cta": "Try this",
-                "send_as": "assistant",
-                "suppression_key": "refine",
-                "rationale": "Fallback response"
+        else:
+            response = {
+                "action": "send",
+                "body": {
+                    "message": safe_str("Let me refine this recommendation based on your business."),
+                    "cta": "Try this",
+                    "send_as": "assistant",
+                    "suppression_key": "refine",
+                    "rationale": "Fallback response"
+                }
             }
-        }
+
+        # -----------------------------
+        # ADD FINAL SAFETY (VERY IMPORTANT)
+        # -----------------------------
+        if not isinstance(response, dict):
+            return {"action": "end"}
+
+        if response.get("action") == "send":
+            resp_body = response.get("body", {})
+            if not isinstance(resp_body.get("message"), str):
+                resp_body["message"] = str(resp_body.get("message") or "")
+            response["body"] = resp_body
+
+        return response
 
     except Exception as e:
         # ABSOLUTE SAFETY NET
