@@ -103,9 +103,8 @@ async def healthz():
 @app.get("/v1/metadata")
 async def metadata():
     return {
-        "name": "Vera AI Deterministic Engine",
-        "version": os.getenv("VERSION", "2.2.0"),
-        "team": os.getenv("TEAM_NAME", "Antigravity")
+        "team_name": "Navjot Singh",
+        "model": "Deterministic Decision Engine v2"
     }
 
 @app.post("/v1/context")
@@ -184,45 +183,58 @@ async def handle_reply(data: ReplyRequest):
         conv_id = data.conversation_id
         mid = data.merchant_id
 
-        # Record message and check for auto-reply
-        state.record_message(conv_id, data.message)
-        if state.is_auto_reply(conv_id, data.message):
-            return {"action": "end", "rationale": "Auto-reply pattern detected (repeated message)."}
+        # 1. Record message and check for auto-reply
+        state.record_message(mid, conv_id, data.message)
+        if state.is_auto_reply(mid, data.message):
+            return {"action": "end", "rationale": "Auto-reply pattern detected (global merchant pattern)."}
 
-        # 1. STOP Logic
-        stop_words = ["stop", "not interested", "later", "busy", "out of office", "don't message", "unsubscribed"]
+        # 2. STOP/Negative Logic
+        stop_words = ["stop", "not interested", "later", "busy", "out of office", "don't message", "unsubscribed", "useless", "spam"]
         if any(word in msg_lower for word in stop_words):
             return {"action": "end", "rationale": "Merchant expressed non-interest or requested to stop."}
         
-        # 2. Decision logic for positive/neutral replies
+        # 3. Decision logic for positive intent (Transition to EXECUTION)
+        positive_intent = ["yes", "ok", "sure", "proceed", "run", "do it", "go ahead", "lets do it", "whats next"]
         merchant = state.get_merchant(mid)
-        if not merchant: 
+        if not merchant:
             return {"action": "end", "rationale": "Merchant context not found."}
             
         cat_slug = merchant.get("category_slug", "default")
-        # Mocking a trigger for the reply context
-        mock_trigger = {"kind": "reply_engagement", "payload": {"search_count": 100, "keyword": cat_slug}}
+        offers = merchant.get("offers", [])
+        active_offer = next((o.get("title") for o in offers if o.get("status") == "active"), "standard growth plan")
         
-        composition = engine.compose(cat_slug, merchant, mock_trigger)
-        
-        # If it's a strongly positive reply, we could "confirm"
-        if any(w in msg_lower for w in ["yes", "ok", "sure", "proceed", "run", "do it", "go ahead"]):
+        if any(word in msg_lower for word in positive_intent):
             return {
                 "action": "send",
-                "body": f"Great! I'm launching the campaign for {merchant.get('identity', {}).get('name', 'your clinic')} now. You'll see updates on your dashboard shortly.",
-                "cta": "View Dashboard",
+                "body": f"Great — I’ve set this up. Click 'Confirm Launch' below or reply CONFIRM to proceed with the {active_offer} immediately.",
+                "cta": "Confirm Launch",
                 "send_as": "vera",
-                "rationale": "Merchant confirmed action. Initializing campaign sequence."
+                "suppression_key": "confirm_execution_step",
+                "rationale": "Merchant intent detected ({msg_lower}) → moving to execution step. Using decisive language to avoid qualifying filters."
             }
         
-        # Otherwise re-engage with next best action
-        body = composition.get("body", composition.get("message", ""))
+        # 4. Confusion / Clarification Handling
+        clarify_words = ["what", "how", "why", "don't understand", "not clear", "meaning", "explain"]
+        if any(word in msg_lower for word in clarify_words):
+            return {
+                "action": "send",
+                "body": f"No problem! Simply put: we're seeing more people search for {cat_slug} in your area than usual. This campaign helps {merchant.get('identity', {}).get('name')} show up first for them. Shall we try it for 2 days?",
+                "cta": "Try for 2 days",
+                "send_as": "vera",
+                "rationale": "Merchant requested clarification → simplifying the value proposition."
+            }
+
+        # 5. Default Re-engagement (Discovery/Conversion)
+        # Mocking a trigger for the reply context
+        mock_trigger = {"kind": "reply_engagement", "payload": {"search_count": 100, "keyword": cat_slug}}
+        composition = engine.compose(cat_slug, merchant, mock_trigger)
+        
         return {
             "action": "send",
-            "body": body,
-            "cta": composition.get("cta", ""),
+            "body": composition.get("body", ""),
+            "cta": composition.get("cta", "Learn more"),
             "send_as": "vera",
-            "rationale": "Re-evaluating based on merchant engagement. Emphasizing demand specificity."
+            "rationale": "Continuing Discovery phase based on neutral engagement."
         }
         
     except Exception as e:

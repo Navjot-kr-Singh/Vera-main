@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from typing import Dict, Any, Optional
 
 # Use /tmp for persistence on Vercel
@@ -21,6 +22,8 @@ class StateManager:
             self.data["suppression"] = {} # key: (merchant_id or customer_id), value: last_intent
         if "conversations" not in self.data:
             self.data["conversations"] = {} # key: conv_id, value: list of messages
+        if "merchant_history" not in self.data:
+            self.data["merchant_history"] = {} # key: mid, value: list of messages
 
     def _load(self):
         if os.path.exists(DB_FILE):
@@ -120,28 +123,41 @@ class StateManager:
             del self.data["suppression"][key]
             self.save()
 
-    def record_message(self, conv_id: str, message: str):
+    def record_message(self, mid: str, conv_id: str, message: str):
+        # Per conversation history
         if conv_id not in self.data["conversations"]:
             self.data["conversations"][conv_id] = []
         self.data["conversations"][conv_id].append({
             "message": message,
             "timestamp": time.time()
         })
-        # Keep only last 10 messages
         self.data["conversations"][conv_id] = self.data["conversations"][conv_id][-10:]
+        
+        # Global merchant history (for auto-reply detection)
+        if mid not in self.data["merchant_history"]:
+            self.data["merchant_history"][mid] = []
+        self.data["merchant_history"][mid].append({
+            "message": message,
+            "timestamp": time.time()
+        })
+        self.data["merchant_history"][mid] = self.data["merchant_history"][mid][-10:]
+        
         self.save()
 
-    def is_auto_reply(self, conv_id: str, message: str) -> bool:
-        history = self.data["conversations"].get(conv_id, [])
-        if len(history) < 2:
+    def is_auto_reply(self, mid: str, message: str) -> bool:
+        history = self.data["merchant_history"].get(mid, [])
+        if len(history) < 3:
             return False
         
-        # Check if the same message was sent 3 times in a row
+        # Check if the same message was sent 3 times recently (global for merchant)
         consecutive_count = 0
         for item in reversed(history):
             if item["message"] == message:
                 consecutive_count += 1
             else:
-                break
+                # We allow for interleaved messages if they are identical overall
+                pass
         
-        return consecutive_count >= 3
+        # If the same message appears 3 times in last 5 messages, it's an auto-reply
+        count = sum(1 for item in history[-5:] if item["message"] == message)
+        return count >= 3
