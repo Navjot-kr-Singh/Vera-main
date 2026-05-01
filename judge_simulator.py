@@ -112,7 +112,7 @@ def print_score_bar(dimension: str, score: int, max_score: int = 10):
     print(f"  {dimension:22} [{color}{'█' * bar_filled}{Colors.DIM}{'░' * bar_empty}{Colors.RESET}] {color}{score:2}/{max_score}{Colors.RESET}")
 
 def print_reason(text: str):
-    wrapped = text[:200] + "..." if len(text) > 200 else text
+    wrapped = text[:200] + "" if len(text) > 200 else text
     print(f"    {Colors.DIM}{wrapped}{Colors.RESET}")
 
 def print_hint(hint: str):
@@ -542,7 +542,7 @@ Send As: {action.get('send_as', 'vera')}
 Score each dimension 0-10 with clear reasoning. Be STRICT."""
 
         try:
-            print_llm("Analyzing message...")
+            print_llm("Analyzing message")
             response = self.llm.complete(prompt, self.SYSTEM)
             return self._parse_response(response, action)
         except Exception as e:
@@ -715,7 +715,7 @@ class JudgeSimulator:
         auto_msg = "Thank you for contacting us! Our team will respond shortly."
 
         for i in range(1, 5):
-            print_info(f"Turn {i}: Sending auto-reply...")
+            print_info(f"Turn {i}: Sending auto-reply")
             data, err, _ = self.client.reply(f"conv_auto_{i}", mid, auto_msg, i + 1)
 
             if err:
@@ -732,7 +732,7 @@ class JudgeSimulator:
                 print_success(f"Turn {i}: Bot WAITING {wait_s}s")
             else:
                 body = data.get("body", "")[:50]
-                print_warn(f"Turn {i}: Bot sent: \"{body}...\"")
+                print_warn(f"Turn {i}: Bot sent: \"{body}\"")
 
         print_warn("Bot never ended after 4 auto-replies")
         return True
@@ -760,7 +760,7 @@ class JudgeSimulator:
 
         print_info(f"Bot action: {action}")
         if body:
-            print_info(f"Bot body: \"{body[:100]}{'...' if len(body) > 100 else ''}\"")
+            print_info(f"Bot body: \"{body[:100]}{'' if len(body) > 100 else ''}\"")
 
         qualifying = ["would you", "do you", "can you tell", "what if", "how about"]
         actioning = ["done", "sending", "draft", "here", "confirm", "proceed", "next"]
@@ -870,7 +870,7 @@ class JudgeSimulator:
         self.all_scores.append(score)
 
         body = action.get("body", "")[:50]
-        print(f"\n{Colors.CYAN}Message:{Colors.RESET} \"{body}...\"")
+        print(f"\n{Colors.CYAN}Message:{Colors.RESET} \"{body}\"")
 
         print_score_bar("Specificity", score.specificity)
         if verbose and score.specificity_reason:
@@ -956,7 +956,7 @@ def main():
         try:
             print_info(f"LLM Provider: {llm.name()}")
             # Test LLM connection
-            print_info("Testing LLM connection...")
+            print_info("Testing LLM connection")
             test_response = llm.complete("Say 'ready' if you can hear me.", "You are a test assistant.")
             if test_response:
                 print_success("LLM connected successfully")

@@ -64,7 +64,7 @@ The judge calls this whenever it wants the bot to know about new or updated cont
 
 **Response (400)** — malformed:
 ```json
-{ "accepted": false, "reason": "invalid_scope", "details": "..." }
+{ "accepted": false, "reason": "invalid_scope", "details": "" }
 ```
 
 ### 2.2 `POST /v1/tick` — periodic wake-up; bot can initiate
@@ -92,8 +92,8 @@ The judge calls this every **N seconds of simulated time** (default: every 5 sim
       "send_as": "vera",
       "trigger_id": "trg_2026_04_26_research_digest",
       "template_name": "vera_research_digest_v1",
-      "template_params": ["Dr. Meera", "JIDA Oct issue", "..."],
-      "body": "Dr. Meera, JIDA's Oct issue landed...",
+      "template_params": ["Dr. Meera", "JIDA Oct issue", ""],
+      "body": "Dr. Meera, JIDA's Oct issue landed",
       "cta": "open_ended",
       "suppression_key": "research:dentists:2026-W17",
       "rationale": "External research digest with merchant-relevant clinical anchor; merchant is a dentist with high-risk-adult patient cohort"
@@ -129,7 +129,7 @@ The judge calls this with the merchant's (or customer's) reply to a previous bot
 
 ```json
 { "action": "send",
-  "body": "Sending now — also drafted a 90-sec patient-ed WhatsApp...",
+  "body": "Sending now — also drafted a 90-sec patient-ed WhatsApp",
   "cta": "open_ended",
   "rationale": "Honoring the merchant's accept; adding the next-best-step (patient-ed) as low-friction follow-on" }
 ```
@@ -188,10 +188,10 @@ Each `scope` has a fixed payload shape. These mirror the dataclasses defined in 
     { "id": "d_2026W17_jida_fluoride", "kind": "research",
       "title": "3-mo fluoride recall cuts caries 38% better than 6-mo",
       "source": "JIDA Oct 2026, p.14", "trial_n": 2100, "patient_segment": "high_risk_adults",
-      "summary": "..." }
+      "summary": "" }
   ],
   "patient_content_library": [
-    { "id": "pc_001", "title": "3 things your teeth tell you about your heart", "channel": "whatsapp", "body": "..." }
+    { "id": "pc_001", "title": "3 things your teeth tell you about your heart", "channel": "whatsapp", "body": "" }
   ],
   "seasonal_beats": [{ "month_range": "Nov-Feb", "note": "exam-stress bruxism spike" }],
   "trend_signals": [{ "query": "clear aligners delhi", "delta_yoy": 0.62, "segment_age": "28-45" }]
@@ -204,7 +204,7 @@ Each `scope` has a fixed payload shape. These mirror the dataclasses defined in 
   "merchant_id": "m_001_drmeera",
   "category_slug": "dentists",
   "identity": { "name": "Dr. Meera's Dental Clinic", "city": "Delhi", "locality": "Lajpat Nagar",
-                "place_id": "ChIJ...", "verified": true, "languages": ["en", "hi"] },
+                "place_id": "ChIJ", "verified": true, "languages": ["en", "hi"] },
   "subscription": { "status": "active", "plan": "Pro", "days_remaining": 82 },
   "performance": {
     "window_days": 30,
@@ -216,7 +216,7 @@ Each `scope` has a fixed payload shape. These mirror the dataclasses defined in 
     { "id": "o_meera_002", "title": "Deep Cleaning @ ₹499", "status": "expired" }
   ],
   "conversation_history": [
-    { "ts": "2026-04-24T10:00:00Z", "from": "vera", "body": "...", "engagement": "merchant_replied" }
+    { "ts": "2026-04-24T10:00:00Z", "from": "vera", "body": "", "engagement": "merchant_replied" }
   ],
   "customer_aggregate": { "total_unique_ytd": 540, "lapsed_180d_plus": 78, "retention_6mo_pct": 0.38 },
   "signals": ["stale_posts:22d", "ctr_below_peer_median", "high_risk_adult_cohort"]
@@ -418,13 +418,13 @@ async def tick(body: TickBody):
         category = contexts.get(("category", merchant.get("category_slug")), {}).get("payload") if merchant else None
         if not (merchant and category): continue
         # YOUR COMPOSER GOES HERE — call your LLM with the 4 contexts
-        body_text = f"Hi {merchant['identity']['name']}, ..."  # replace with real composition
+        body_text = f"Hi {merchant['identity']['name']}, "  # replace with real composition
         actions.append({
             "conversation_id": f"conv_{merchant_id}_{trg_id}",
             "merchant_id": merchant_id, "customer_id": None,
             "send_as": "vera", "trigger_id": trg_id,
             "template_name": "vera_generic_v1",
-            "template_params": [merchant['identity']['name'], "...", "..."],
+            "template_params": [merchant['identity']['name'], "", ""],
             "body": body_text, "cta": "open_ended",
             "suppression_key": trg.get("suppression_key", ""),
             "rationale": "Composed from category+merchant+trigger"
@@ -445,7 +445,7 @@ class ReplyBody(BaseModel):
 async def reply(body: ReplyBody):
     conversations.setdefault(body.conversation_id, []).append({"from": body.from_role, "msg": body.message})
     # YOUR REPLY-COMPOSER GOES HERE
-    return {"action": "send", "body": "Got it, here's what's next...", "cta": "open_ended",
+    return {"action": "send", "body": "Got it, here's what's next", "cta": "open_ended",
             "rationale": "acknowledged + advanced"}
 ```
 

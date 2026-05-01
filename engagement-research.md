@@ -51,7 +51,7 @@ Cache-first design:
 3. If snapshot is empty: fall back to `get_aggregated_unassociated_merchant_data` (merchant-support-mcp) — basic GBP health, no commercial data. Wrap it in a snapshot-shaped envelope.
 4. Sequential enrichments:
     - `_prefetch_product_context` — fans out to `vera_get_subscription_context`, `vera_get_performance_summary`, and (only if DA subscribed) `da_get_campaign_context`. ~2KB total, embedded into snapshot.
-    - `_enrich_snapshot_with_pricing` — direct HTTP to `https://vera.magicpin.com/api/v1/merchant/pricing/get?mid=...` (vera-mcp's pricing path is unreachable locally). Mounted into snapshot as `pricing_recommendation`.
+    - `_enrich_snapshot_with_pricing` — direct HTTP to `https://vera.magicpin.com/api/v1/merchant/pricing/get?mid=` (vera-mcp's pricing path is unreachable locally). Mounted into snapshot as `pricing_recommendation`.
 5. Stuff result into Redis at the same key, TTL 30 min.
 
 Final state: `self._merchant_snapshot` and `self._behavioral_profile` are populated. `_get_system_prompt()` reads from these and serializes the snapshot directly into the LLM system prompt (`merchant_agent.py:996`).

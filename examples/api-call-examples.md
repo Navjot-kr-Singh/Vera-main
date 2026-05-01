@@ -365,7 +365,7 @@ While the conversation is live, the judge pushes a new digest item. A good bot w
       { "id": "d_2026W17_dci_radiograph_NEW", "kind": "compliance", "title": "DCI revised radiograph dose limits effective 2026-12-15",
         "source": "DCI circular 2026-11-04", "summary": "Max dose drops 1.5→1.0 mSv per IOPA. E-speed film passes; D-speed does not." }
     ],
-    "// other fields": "..."
+    "// other fields": ""
   }
 }
 ```
@@ -447,7 +447,7 @@ The judge sends 4 turns of identical canned auto-replies.
 
 **Turn 1 — bot initiates**
 ```json
-POST /v1/tick { "now": "...", "available_triggers": ["trg_022_cde_webinar_dentists"] }
+POST /v1/tick { "now": "", "available_triggers": ["trg_022_cde_webinar_dentists"] }
 → { "actions": [{ /* CDE webinar invite */ }] }
 ```
 
@@ -510,7 +510,7 @@ POST /v1/reply { "from_role": "merchant",
 ```json
 { "action": "send",
   "body": "Excellent! Just to plan well — would you say most of your high-risk patients are diabetic, or is there another common factor?",
-  "rationale": "Continuing qualification..."  // ← penalty: ignored explicit intent transition
+  "rationale": "Continuing qualification"  // ← penalty: ignored explicit intent transition
 }
 ```
 
@@ -548,7 +548,7 @@ If `/v1/tick` doesn't respond within 10s, the judge logs a timeout and continues
 ### Example F.2 — Malformed response
 
 ```json
-{ "actions": [{ "merchant_id": "m_001", "body": "..." }] }
+{ "actions": [{ "merchant_id": "m_001", "body": "" }] }
 ```
 
 Missing required fields (`conversation_id`, `send_as`, `trigger_id`, `cta`, `suppression_key`, `rationale`) → action scored as 0, -2 penalty.
@@ -556,7 +556,7 @@ Missing required fields (`conversation_id`, `send_as`, `trigger_id`, `cta`, `sup
 ### Example F.3 — Body too long
 
 ```json
-{ "body": "...500 chars..." }
+{ "body": "500 chars" }
 ```
 
 Body > 320 chars → action scored normally but specificity dimension capped at 5/10.

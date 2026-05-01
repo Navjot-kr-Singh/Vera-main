@@ -139,68 +139,60 @@ async def tick(data: Optional[TickRequest] = None):
 
 @app.post("/v1/reply")
 async def handle_reply(request: Request):
-    try:
-        body = await request.json()
-        
-        # Robust parsing of multiple possible fields
-        text = (
-            body.get("message") or 
-            body.get("reply") or 
-            body.get("text") or 
-            ""
-        )
-        text = str(text).lower().strip()
+    body = await request.json()
 
-        # --------------------------
-        # 1. AUTO-REPLY DETECTION
-        # --------------------------
-        auto_reply_keywords = [
-            "busy", "meeting", "call you later", "out of office",
-            "driving", "will get back", "auto reply", "away"
-        ]
+    # -----------------------------
+    # ROBUST TEXT EXTRACTION
+    # -----------------------------
+    text = (
+        body.get("message")
+        or body.get("reply")
+        or body.get("text")
+        or ""
+    ).lower()
 
-        if any(k in text for k in auto_reply_keywords):
-            return {"action": "end"}
-
-        # --------------------------
-        # 2. HOSTILE / STOP
-        # --------------------------
-        hostile_keywords = [
-            "stop", "don't message", "spam", "useless",
-            "not interested", "leave me", "remove me"
-        ]
-
-        if any(k in text for k in hostile_keywords):
-            return {"action": "end"}
-
-        # --------------------------
-        # 3. POSITIVE INTENT
-        # --------------------------
-        positive_keywords = [
-            "ok", "yes", "do it", "go ahead", "lets do it", "sounds good"
-        ]
-
-        if any(k in text for k in positive_keywords):
-            return {
-                "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
-                "cta": "Confirm",
-                "send_as": "assistant",
-                "suppression_key": "confirm_campaign",
-                "rationale": "Merchant intent detected → moving to execution step"
-            }
-
-        # --------------------------
-        # 4. DEFAULT SAFE RESPONSE
-        # --------------------------
-        return {
-            "message": "Let me refine this recommendation based on your business.",
-            "cta": "Try this",
-            "send_as": "assistant",
-            "suppression_key": "refine",
-            "rationale": "Fallback response"
-        }
-    except Exception as e:
+    # -----------------------------
+    # AUTO-REPLY DETECTION
+    # -----------------------------
+    if any(k in text for k in [
+        "busy", "meeting", "out of office", "away",
+        "call you later", "driving", "will get back"
+    ]):
         return {"action": "end"}
+
+    # -----------------------------
+    # HOSTILE / STOP
+    # -----------------------------
+    if any(k in text for k in [
+        "stop", "spam", "useless", "not interested",
+        "don't message", "leave me"
+    ]):
+        return {"action": "end"}
+
+    # -----------------------------
+    # POSITIVE INTENT
+    # -----------------------------
+    if any(k in text for k in [
+        "ok", "yes", "do it", "go ahead", "lets do it"
+    ]):
+        return {
+            "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
+            "cta": "Confirm",
+            "send_as": "assistant",
+            "suppression_key": "confirm_campaign",
+            "rationale": "Merchant intent detected → moving to execution step"
+        }
+
+    # -----------------------------
+    # SAFE FALLBACK (NO )
+    # -----------------------------
+    return {
+        "message": "Let me refine this recommendation based on your business.",
+        "cta": "Try this",
+        "send_as": "assistant",
+        "suppression_key": "refine",
+        "rationale": "Fallback response"
+    }
 
 if __name__ == "__main__":
     import uvicorn

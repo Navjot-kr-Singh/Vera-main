@@ -48,7 +48,7 @@ The composer takes these 4 (3 if no customer scope) and produces the message bod
 
 ### CategoryContext
 
-Slow-changing knowledge pack per vertical. One per category (`dentists`, `salons`, `gyms`, `restaurants`, `car_service`, ...). Bootstrap is labor-intensive (needs domain expertise); ongoing maintenance is mostly the weekly digest.
+Slow-changing knowledge pack per vertical. One per category (`dentists`, `salons`, `gyms`, `restaurants`, `car_service`, ). Bootstrap is labor-intensive (needs domain expertise); ongoing maintenance is mostly the weekly digest.
 
 Fields:
 
@@ -74,7 +74,7 @@ Fields:
 - `offers` — active + paused, sourced from vera-mcp's offers collection (and eventually the as-yet-undefined "real" offer source-of-truth)
 - `conversation_history` — last N turns w/ Vera, with engagement tags (replied, ignored, unsubscribed-from-topic)
 - `customer_aggregate` — derived stats over the merchant's customer roster (active count, lapsed count, retention rate). Not individual customers — aggregates only.
-- `signals` — derived flags: `stale_posts`, `ctr_below_peer_median`, `customer_lapse_rate_high`, `dormant_with_vera`, ...
+- `signals` — derived flags: `stale_posts`, `ctr_below_peer_median`, `customer_lapse_rate_high`, `dormant_with_vera`, 
 
 ### TriggerContext
 
@@ -87,7 +87,7 @@ Fields:
 
 - `id` — unique
 - `scope` — `merchant` | `customer`
-- `kind` — `research_digest`, `recall_due`, `perf_spike`, `competitor_opened`, `festival`, ...
+- `kind` — `research_digest`, `recall_due`, `perf_spike`, `competitor_opened`, `festival`, 
 - `source` — `external` | `internal`
 - `payload` — kind-specific data (e.g., for `recall_due`: `{patient_id, last_visit, due_date}`)
 - `urgency` — 1-5; ranks against other queued triggers
@@ -122,7 +122,7 @@ Single LLM-prompted module. Takes the 4 contexts as input. Produces:
 
 The composer prompt is the single point of failure. It must be:
 
-- Versioned (`composer_v1`, `composer_v2`, ...)
+- Versioned (`composer_v1`, `composer_v2`, )
 - A/B-testable
 - Auditable (we can replay any past message and see all 4 input contexts)
 

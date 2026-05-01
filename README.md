@@ -75,11 +75,11 @@ curl -X POST http://localhost:8000/api/generate \
   "alternative_variations": [
     {
       "message": "We missed you! Come back for this: Weekend Special! Treat yourself to Pizza Hut. Buy 1 Get 1 Free waiting for you! Visit today! 🍔",
-      "reasoning": "...",
-      "tags": ["..."],
+      "reasoning": "",
+      "tags": [""],
       "confidence_score": 85
     },
-    { ... }
+    {  }
   ]
 }
 ```

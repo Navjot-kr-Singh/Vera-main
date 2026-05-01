@@ -67,7 +67,7 @@ Slow-changing knowledge pack about *the kind of business this is*. Shared across
 ```python
 @dataclass
 class CategoryContext:
-    slug: str                          # "dentists", "salons", "restaurants", ...
+    slug: str                          # "dentists", "salons", "restaurants", 
     offer_catalog: list[OfferTemplate] # canonical service+price patterns for this vertical
     voice: VoiceProfile                # tone, allowed vocabulary, taboos
     peer_stats: PeerStats              # benchmarks: avg rating, avg reviews, typical CTR
@@ -98,7 +98,7 @@ class MerchantContext:
     offers: list[MerchantOffer]       # active + paused offers from their catalog
     conversation_history: ConversationHistory  # last N turns w/ Vera, w/ engagement tags
     customer_aggregate: CustomerAggregate  # active count, lapsed count, retention %
-    signals: list[DerivedSignal]      # "stale_posts", "ctr_below_peer", "dormant", ...
+    signals: list[DerivedSignal]      # "stale_posts", "ctr_below_peer", "dormant", 
 ```
 
 **Running example — Dr. Meera's Dental Clinic**:
@@ -118,7 +118,7 @@ The *event* that prompts this message right now. Every message must have one.
 class TriggerContext:
     id: str
     scope: Literal["merchant", "customer"]
-    kind: str                # "research_digest", "recall_due", "perf_spike", ...
+    kind: str                # "research_digest", "recall_due", "perf_spike", 
     source: Literal["external", "internal"]
     payload: dict
     urgency: int             # 1-5
@@ -240,19 +240,19 @@ dataset/
 │   ├── m_001_drmeera_dentist_delhi.json
 │   ├── m_002_studio11_salon_hyderabad.json
 │   ├── m_003_pizzajunction_restaurant_delhi.json
-│   ├── ...                    # 50 fully-populated MerchantContexts (10 per category)
+│   ├──                     # 50 fully-populated MerchantContexts (10 per category)
 │   └── m_050_*.json
 ├── customers/
 │   ├── c_001_priya_for_m001.json
 │   ├── c_002_rohit_for_m001.json
-│   ├── ...                    # 200 customer profiles, distributed across merchants
+│   ├──                     # 200 customer profiles, distributed across merchants
 │   └── c_200_*.json
 └── triggers/
     ├── trg_external_001_diwali.json
     ├── trg_external_002_heatwave_delhi.json
     ├── trg_internal_001_recall_due_priya.json
     ├── trg_internal_002_perf_spike_m003.json
-    ├── ...                    # 100 sample triggers covering all kinds
+    ├──                     # 100 sample triggers covering all kinds
     └── trg_100_*.json
 ```
 
@@ -277,13 +277,13 @@ def compose(category: dict, merchant: dict, trigger: dict, customer: dict | None
     Must be deterministic given the same inputs (set temperature=0 if using LLMs).
     Must complete in < 10s per call.
     """
-    ...
+    
 ```
 
 ### 7.2 `submission.jsonl` (30 lines, one per test pair)
 
 ```json
-{"test_id": "T01", "body": "Hi Dr. Meera, JIDA's Oct issue ...", "cta": "open_ended", "send_as": "vera", "suppression_key": "...", "rationale": "..."}
+{"test_id": "T01", "body": "Hi Dr. Meera, JIDA's Oct issue ", "cta": "open_ended", "send_as": "vera", "suppression_key": "", "rationale": ""}
 ```
 
 ### 7.3 `README.md` (1 page max)
@@ -297,7 +297,7 @@ If you want to demonstrate multi-turn handling (replying to merchant responses),
 ```python
 def respond(state: ConversationState, merchant_message: str) -> dict:
     """Given the conversation so far + the merchant's latest message, produce the reply."""
-    ...
+    
 ```
 
 Multi-turn capability is a tiebreaker, not a requirement.
@@ -357,7 +357,7 @@ These are real conversations from production Vera — provided as reference, not
 [USER]  I can't see my profile is updated yet. It is showing temporarily closed.
 [VERA]  Google ke changes mein 24-48 ghante lagte hain. Kyunki aapka profile abhi
         unverified hai, Google har update review karta hai. Tab tak main aur
-        cheezein add kar sakti hoon...
+        cheezein add kar sakti hoon
 ```
 **What's right**: Hindi-English mix, specific numbers (62.5%, 24-48 ghante), Vera does work + reports back, handles uncertainty honestly.
 
@@ -365,12 +365,12 @@ These are real conversations from production Vera — provided as reference, not
 
 ```
 [VERA]     Studio11 Family Salon ka Google profile check kar rahi thi — aapki 4.9★
-           rating hai 298 reviews ke saath... business description missing hai.
+           rating hai 298 reviews ke saath business description missing hai.
 [MERCHANT] Aapki jaankari ke liye bahut-bahut shukriya. Main aapki yeh sabhi baatein
            aur sujhaav hamari team tak pahuncha deti hoon.   ← merchant's auto-reply
 [VERA]     Samajh gayi. Team tak pahunchane se pehle, kya aap khud dekhna chahingi
            ki exact kya missing hai Google pe? 2 minute ka kaam hai. Chalega?
-[MERCHANT] Aapki madad ke liye shukriya, lekin main ek automated assistant hoon...
+[MERCHANT] Aapki madad ke liye shukriya, lekin main ek automated assistant hoon
 [VERA]     Koi baat nahi, samajh gayi. Main owner/manager se directly connect kar
            lungi. Aapka salon accha chal raha hai — best wishes! 🙂
 ```
