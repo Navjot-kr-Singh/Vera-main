@@ -3,11 +3,20 @@ import os
 import time
 from typing import Dict, Any, Optional
 
-# Use /tmp for persistence on Vercel
+# Define bundled and persistent paths
+BUNDLE_DB = os.path.join(os.path.dirname(__file__), "db.json")
+
 if os.environ.get("VERCEL"):
     DB_FILE = "/tmp/db.json"
+    # Bootstrap /tmp with bundled data if missing
+    if not os.path.exists(DB_FILE) and os.path.exists(BUNDLE_DB):
+        try:
+            import shutil
+            shutil.copy(BUNDLE_DB, DB_FILE)
+        except Exception as e:
+            print(f"Bootstrap error: {e}")
 else:
-    DB_FILE = os.path.join(os.path.dirname(__file__), "db.json")
+    DB_FILE = BUNDLE_DB
 
 class StateManager:
     """
