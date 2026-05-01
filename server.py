@@ -136,58 +136,43 @@ async def tick(data: Optional[TickRequest] = None):
 @app.post("/v1/reply")
 async def handle_reply(data: ReplyRequest):
     try:
-        msg_lower = data.reply.lower()
+        msg_lower = data.reply.lower().strip()
         
-        # 1. Negative Intent Logic
-        stop_words = ["not interested", "stop", "busy", "later", "out of office", "don't message", "unsubscribed", "useless", "spam"]
-        if any(word in msg_lower for word in stop_words):
+        # 🛑 FIX #1 & #2 — AUTO-REPLY & HOSTILE DETECTION
+        # Patterns that should immediately end the conversation
+        end_patterns = [
+            "busy", "in a meeting", "call you later", "out of office", "driving", 
+            "will get back", "auto reply", "stop", "don't message", "spam", 
+            "useless", "not interested", "later", "unsubscribed"
+        ]
+        
+        if any(pattern in msg_lower for pattern in end_patterns):
             return {"action": "end"}
         
-        # 2. Positive Intent Logic (Transition to EXECUTION)
-        positive_intent = ["ok", "yes", "do it", "go ahead", "sure", "proceed", "run", "lets do it"]
-        if any(word in msg_lower for word in positive_intent):
+        # 🚀 FIX #3 — INTENT DETECTION (ROBUST)
+        # Positive intent patterns
+        positive_intent = ["ok", "yes", "do it", "go ahead", "lets do it", "sounds good", "sure", "proceed"]
+        
+        if any(pattern in msg_lower for pattern in positive_intent):
             return {
-                "message": "Great — I’ll set this up. Proceed with the selected offer today?",
+                "message": "Great — I’ll set this up. Do you want to proceed with the selected offer today?",
                 "cta": "Confirm",
                 "send_as": "assistant",
                 "suppression_key": "confirm_campaign",
-                "rationale": "Merchant intent detected → moving to execution"
+                "rationale": "Merchant intent detected → moving to execution step"
             }
         
-        # 3. Default Composition Logic
-        # Extract context if provided, else use state
-        context = data.context or {}
-        
-        # Try to find a merchant to use for composition
-        merchant = context.get("merchant")
-        if not merchant:
-            # Fallback: get the first available merchant from state
-            merchants = list(state.data.get("merchants", {}).values())
-            merchant = merchants[0] if merchants else {"identity": {"name": "Merchant"}, "merchant_id": "m1"}
-        
-        mid = merchant.get("merchant_id", "m1")
-        cat_slug = merchant.get("category_slug", "default")
-        
-        # Try to find a trigger
-        trigger = context.get("trigger")
-        if not trigger:
-            trigger = {"kind": "reply_engagement", "payload": {"search_count": 100, "keyword": cat_slug}}
-            
-        customer = context.get("customer")
-        
-        composition = engine.compose(cat_slug, merchant, trigger, customer)
-        
+        # 🧠 FIX #5 — DEFAULT FALLBACK
+        # If no condition matches, return the safe fallback message
         return {
-            "message": composition.get("body", composition.get("message", "")),
-            "cta": composition.get("cta", "Learn more"),
+            "message": "Let me refine this recommendation based on your business.",
+            "cta": "Try this",
             "send_as": "assistant",
-            "suppression_key": composition.get("suppression_key", "default_reply"),
-            "rationale": composition.get("rationale", "Continuing engagement based on neutral response.")
+            "suppression_key": "refine",
+            "rationale": "Fallback response for unclear intent"
         }
         
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return {"action": "end"}
 
 if __name__ == "__main__":
