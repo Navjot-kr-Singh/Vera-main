@@ -123,26 +123,34 @@ async def push_context(data: Dict[str, Any]):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 @app.post("/v1/tick")
-async def tick(data: Optional[TickRequest] = None):
+async def tick(request: Request):
     try:
-        if not data or not data.available_triggers:
+        raw_body = await request.json()
+        
+        # Robustly handle available_triggers extraction
+        if isinstance(raw_body, list):
+            available_triggers = raw_body
+        elif isinstance(raw_body, dict):
+            available_triggers = raw_body.get("available_triggers", [])
+        else:
+            return {"actions": []}
+        
+        if not available_triggers:
             return {"actions": []}
         
         actions = []
-        for tid in data.available_triggers:
+        for tid in available_triggers:
             trigger = state.get_trigger(tid)
             if not trigger:
                 # -----------------------------
                 # SYNTHETIC FALLBACK (90+ LEVEL)
                 # -----------------------------
-                # If trigger ID is missing (common in manual testing), 
-                # treat it as a KIND and pick the first available merchant.
                 known_kinds = ["search_surge", "perf_dip", "conversion_drop", "perf_spike", "festival_upcoming", "milestone_reached"]
                 if any(k in tid.lower() for k in known_kinds):
                     kind = tid if tid in known_kinds else "search_surge"
                     if "conversion" in tid.lower() or "drop" in tid.lower(): kind = "perf_dip"
                     
-                    # Pick first merchant for context
+                    # Pick first merchant
                     merchants = list(state.data.get("merchants", {}).values())
                     if not merchants: continue
                     merchant = merchants[0]
@@ -168,7 +176,7 @@ async def tick(data: Optional[TickRequest] = None):
                 continue
             
             merchant = state.get_merchant(mid)
-            if not merchant:
+            if not merchant or not merchant.get("merchant_id"):
                 continue
             
             category_slug = merchant.get("category_slug")
@@ -187,17 +195,18 @@ async def tick(data: Optional[TickRequest] = None):
                 "type": "engage",
                 "merchant_id": mid,
                 "trigger_id": tid,
-                "body": res.get("body"),
-                "message": res.get("body"), 
-                "cta": res.get("cta"),
-                "send_as": res.get("send_as", "vera"),
-                "suppression_key": res.get("suppression_key"),
-                "rationale": res.get("rationale")
+                "body": str(res.get("body", "")),
+                "message": str(res.get("body", "")), 
+                "cta": str(res.get("cta", "See details")),
+                "send_as": str(res.get("send_as", "vera")),
+                "suppression_key": str(res.get("suppression_key", "")),
+                "rationale": str(res.get("rationale", ""))
             }
             actions.append(action)
             
         return {"actions": actions}
     except Exception as e:
+        print(f"Tick error: {e}")
         return {"actions": []}
 
 def safe_str(x):
