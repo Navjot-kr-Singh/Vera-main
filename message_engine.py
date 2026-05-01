@@ -100,7 +100,7 @@ class MessageCompositionEngine:
 
         return {
             "action": "send",
-            "body": body,
+            "message": body,
             "cta": cta,
             "send_as": "assistant",
             "rationale": rationale
@@ -129,7 +129,7 @@ class MessageCompositionEngine:
 
         return {
             "action": "send",
-            "body": body,
+            "message": body,
             "cta": cta,
             "send_as": "assistant",
             "rationale": rationale
@@ -139,7 +139,7 @@ class MessageCompositionEngine:
         name = merchant.get("identity", {}).get("name", "there")
         return {
             "action": "send",
-            "body": f"Hi {name}, I noticed a growth opportunity for your business. Want to see the details?",
+            "message": f"Hi {name}, I noticed a growth opportunity for your business. Want to see the details?",
             "cta": "See Details",
             "send_as": "assistant",
             "rationale": "Safe fallback triggered due to unexpected error."
@@ -171,7 +171,7 @@ class MessageCompositionEngine:
                 {
                     "mode_id": "v2_deterministic",
                     "mode_name": "Smart Decision Engine v2",
-                    "message": res.get("body"),
+                    "message": res.get("message"),
                     "reasoning": res.get("rationale"),
                     "tags": ["Insight-Driven", "High Conversion", "Business Aware"],
                     "confidence_score": 98,
