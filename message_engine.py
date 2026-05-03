@@ -46,32 +46,65 @@ class MessageCompositionEngine:
     def _compose_merchant_facing(self, category: Dict[str, Any], merchant: Dict[str, Any], trigger: Dict[str, Any]) -> Dict[str, Any]:
         kind = trigger.get("kind")
         payload = trigger.get("payload", {})
+        # Robust Extraction (Flat or Nested)
         m_identity = merchant.get("identity", {})
-        m_name = m_identity.get("name", "your business")
-        owner_name = m_identity.get("owner_first_name", "")
-        location = m_identity.get("locality", "your area")
-        category_slug = category.get("slug", "business")
+        if not isinstance(m_identity, dict):
+            m_identity = {}
+            
+        m_name = m_identity.get("name") or merchant.get("name") or "your business"
+        owner_name = m_identity.get("owner_first_name") or merchant.get("owner_first_name") or ""
+        location = m_identity.get("locality") or merchant.get("city") or merchant.get("locality") or "your area"
         
-        # Salutation
-        salutation = f"Dr. {owner_name}" if category_slug == "dentists" and owner_name else (owner_name or m_name)
+        category_slug = category.get("slug", "business").lower()
+        
+        if category_slug == "dentists" and owner_name:
+            salutation = f"Dr. {owner_name}"
+            voice_intro = "From a clinical perspective,"
+        elif category_slug == "salons" and owner_name:
+            salutation = f"Hi {owner_name}"
+            voice_intro = "To keep your chairs full and clients looking great,"
+        elif category_slug == "gyms" and owner_name:
+            salutation = f"Coach {owner_name}"
+            voice_intro = "Let's push those membership numbers up."
+        elif category_slug == "pharmacies" and owner_name:
+            salutation = f"Pharmacist {owner_name}"
+            voice_intro = "Ensuring precise care and compliance,"
+        elif category_slug == "restaurants" and owner_name:
+            salutation = f"Chef {owner_name}"
+            voice_intro = "Operator-to-operator, let's drive more orders."
+        else:
+            salutation = owner_name or m_name
+            voice_intro = "Looking at your business metrics,"
+            
+        language = m_identity.get("languages", ["English"])[0] if m_identity.get("languages") else "English"
+        lang_note = f" (localized in {language})" if language.lower() != "english" else ""
         
         # Performance data
         perf = merchant.get("performance", {})
+        if not isinstance(perf, dict):
+            perf = {}
         views = perf.get("views", 0)
         calls = perf.get("calls", 0)
         ctr = perf.get("ctr", 0.0)
         
         # Peer benchmarks
         peer_stats = category.get("peer_stats", {})
+        if not isinstance(peer_stats, dict):
+            peer_stats = {}
         peer_ctr = peer_stats.get("avg_ctr", 0.03)
         
         # Active offer
         offers = merchant.get("offers", [])
-        active_offer = next((o.get("title") for o in offers if o.get("status") == "active"), None)
+        if not isinstance(offers, list):
+            offers = []
+        active_offer = next((o.get("title") for o in offers if isinstance(o, dict) and o.get("status") == "active"), None)
+        
         if not active_offer:
-            # Pick from catalog
+            active_offer = merchant.get("offer")
+            
+        if not active_offer:
             catalog = category.get("offer_catalog", [])
-            active_offer = catalog[0].get("title") if catalog else "custom growth plan"
+            active_offer = catalog[0].get("title") if isinstance(catalog, list) and catalog else "custom growth plan"
 
         body = ""
         cta = "Launch this now?"
@@ -84,11 +117,11 @@ class MessageCompositionEngine:
             if item:
                 title = item.get("title")
                 source = item.get("source")
-                body = f"{salutation}, {source} just released data on '{title}'. Based on your {location} patient-mix, I've identified a lift opportunity. I've drafted a clinical update to position your practice as an authority. Shall I publish?"
+                body = f"{salutation}, {source} just released data on '{title}'. {voice_intro} based on your {location} patient-mix and {views} recent views, I've identified a {peer_ctr*100:.1f}% lift opportunity. I've drafted an update{lang_note} to position your practice as an authority. Shall I publish?"
                 cta = f"Publish {source} Update"
                 rationale = f"Decisive clinical positioning based on {source} specificity."
             else:
-                body = f"{salutation}, new research on {category_slug} just dropped. I've analyzed the 2-min summary for your {location} practice. Shall I send the briefing?"
+                body = f"{salutation}, new research on {category_slug} just dropped. {voice_intro} I've analyzed the 2-min summary for your {location} practice. Shall I send the briefing?"
                 cta = "Send Research Briefing"
 
         elif kind == "regulation_change":
@@ -97,16 +130,21 @@ class MessageCompositionEngine:
             digest_items = category.get("digest", [])
             item = next((i for i in digest_items if i["id"] == item_id), None)
             if item:
-                title = item.get("title")
-                source = item.get("source")
-                body = f"Compliance Alert: {source} has revised {title} effective {deadline}. I've flagged a potential gap in your {location} setup. I'm ready to audit your SOPs to ensure you meet the new {item.get('summary', '').split()[0]} limits. Shall I start?"
+                title = item.get("title", "a regulation change")
+                source = item.get("source", "The authorities")
+                # Remove redundant deadline from title if present
+                clean_title = title.split("effective")[0].strip() if "effective" in title else title
+                summary_word = item.get('summary', 'compliance').split()[0]
+                
+                body = f"Compliance Alert: {source} has revised '{clean_title}' effective {deadline}. {voice_intro} I've flagged a potential gap in your {location} setup. I'm ready to audit your SOPs to ensure you meet the new {summary_word} requirements and maintain your {calls} monthly calls. Shall I start?"
                 cta = f"Audit My {category_slug.capitalize()[:-1] if category_slug.endswith('s') else category_slug.capitalize()}"
                 rationale = "Direct compliance advisor tone with clear next step."
 
         elif kind == "perf_dip":
             metric = payload.get("metric", "views")
             dip = abs(payload.get("delta_pct", 0) * 100)
-            body = f"Visibility Alert: {m_name} is missing ~{dip:.0f}% of {location} searches. Your CTR ({ctr:.3f}) is trailing peers ({peer_ctr:.3f}). I'm ready to push your {active_offer} to regain your ranking. Shall I proceed?"
+            kw = payload.get("keyword", category_slug)
+            body = f"Visibility Alert: {salutation}, {m_name} is missing ~{dip:.0f}% of '{kw}' searches in {location}. Your CTR ({ctr:.3f}) is trailing category peers ({peer_ctr:.3f}). {voice_intro} I'm ready to push your '{active_offer}'{lang_note} to regain your ranking and recover lost calls. Shall I proceed?"
             cta = "Optimize Profile Ranking"
             rationale = f"Corrective advisor tone using peer benchmarking ({peer_ctr:.3f})."
 
@@ -114,7 +152,8 @@ class MessageCompositionEngine:
             metric = payload.get("metric", "views")
             spike = abs(payload.get("delta_pct", 0) * 100)
             if spike == 0: spike = 142
-            body = f"Demand Spike: I've detected a {spike:.0f}% surge in {location} searches for {category_slug}. I'm activating your {active_offer} to capture this intent before the window closes. Shall I go live?"
+            kw = payload.get("keyword", category_slug)
+            body = f"Demand Spike: {salutation}, I've detected a {spike:.0f}% surge in {location} searches for '{kw}'. {voice_intro} with your {views} recent views, intent is high. I'm activating your '{active_offer}'{lang_note} to capture this before the window closes. Shall I go live?"
             offer_action = active_offer.split('@')[-1].strip() if '@' in active_offer else active_offer
             cta = f"Activate {offer_action} Offer"
             rationale = "Momentum exploitation with decisive CTA."
@@ -122,7 +161,7 @@ class MessageCompositionEngine:
         elif kind == "festival_upcoming":
             festival = payload.get("festival", "upcoming peak")
             days = payload.get("days_until", 7)
-            body = f"Peak Demand: {festival} is {days} days away. {location} intent is rising, but your profile is currently dormant. I'm launching your {active_offer} to capture this festive surge. Shall I proceed?"
+            body = f"Peak Demand: {salutation}, {festival} is {days} days away. {location} intent is rising, but {m_name} is currently dormant. {voice_intro} I'm launching your '{active_offer}'{lang_note} to capture this festive surge and boost your {views} base views. Shall I proceed?"
             cta = f"Launch {festival} Offer"
             rationale = "Temporal urgency with proactive launch stance."
 
@@ -130,33 +169,59 @@ class MessageCompositionEngine:
             metric = payload.get("metric", "reviews").replace("_", " ")
             val = payload.get("value_now")
             target = payload.get("milestone_value")
-            body = f"Authority Boost: {m_name} is at {val} {metric} — just {target - val} away from the {target} milestone. I'm pushing a targeted review-nudge to bridge this gap today. Shall I send?"
+            body = f"Authority Boost: {salutation}, {m_name} is at {val} {metric} — just {target - val} away from the {target} milestone. {voice_intro} I'm pushing a targeted review-nudge{lang_note} to bridge this gap today. Shall I send?"
             cta = f"Hit {target} Milestone"
             rationale = "Decisive social proof reinforcement."
 
         elif kind == "gbp_unverified":
             uplift = payload.get("estimated_uplift_pct", 0.30) * 100
-            body = f"Visibility Gap: {m_name} is losing ~{uplift:.0f}% of potential calls in {location} due to being unverified. I've mapped the fastest verification path for you. Shall I start the process?"
+            body = f"Visibility Gap: {salutation}, {m_name} is losing ~{uplift:.0f}% of potential calls in {location} due to being unverified. {voice_intro} I've mapped the fastest verification path for you to protect your {views} baseline views. Shall I start the process?"
             cta = "Verify My Business"
             rationale = "Clear ROI advisor tone (30% uplift)."
 
         elif kind == "supply_alert":
             item = payload.get("molecule") or payload.get("item", "stock")
             mfr = payload.get("manufacturer", "the manufacturer")
-            body = f"Safety Alert: {mfr} has issued a recall for {item}. I've identified your affected patients in {location}. I'm pulling the reach-out list now to ensure compliance. Ready to review?"
+            body = f"Safety Alert: {salutation}, {mfr} has issued a recall for {item}. {voice_intro} I've identified your affected patients in {location}. I'm pulling the reach-out list{lang_note} now to ensure compliance. Ready to review?"
             cta = "Review Patient List"
             rationale = "High-authority safety advisor stance."
 
+        elif kind == "low_sales":
+            body = f"Revenue Alert: {salutation}, {m_name}'s daily sales pace is lagging. {voice_intro} if we don't act now, you'll miss this week's targets. I've prepped your '{active_offer}'{lang_note} to drive immediate footfall and recover momentum. Shall I launch it?"
+            cta = "Recover Sales Momentum"
+            rationale = "High urgency loss-aversion hook for low sales."
+
+        elif kind == "weekend":
+            body = f"Weekend Surge: {salutation}, weekend intent is building up in {location}. {voice_intro} competitors are already running campaigns. Let's push your '{active_offer}'{lang_note} right now to ensure your {views} recent views convert into actual bookings before Friday evening. Ready?"
+            cta = "Capture Weekend Bookings"
+            rationale = "Temporal urgency for weekend planning."
+
+        elif kind == "lunch_time":
+            body = f"Lunch Rush: {salutation}, the midday rush in {location} is starting. {voice_intro} to maximize table turns, I recommend activating your '{active_offer}'{lang_note} immediately. Don't let these hungry searchers go to competitors. Go live?"
+            cta = "Activate Lunch Rush"
+            rationale = "Hyper-local temporal trigger with competitive loss-aversion."
+
+        elif kind == "payday":
+            body = f"Payday Opportunity: {salutation}, it's payday week! Consumers in {location} are ready to spend. {voice_intro} let's capitalize on this high-spending window with your '{active_offer}'{lang_note}. Shall we secure these high-value bookings now?"
+            cta = "Launch Payday Campaign"
+            rationale = "Consumer psychology and timing hook."
+
+        elif kind == "rain":
+            body = f"Weather Shift: {salutation}, it's raining in {location}, which means footfall might drop. {voice_intro} we can flip this into an advantage by pushing your '{active_offer}'{lang_note} to people staying indoors and browsing online. Shall I activate it?"
+            cta = "Flip Weather to Revenue"
+            rationale = "Environmental context pivot strategy."
+
         elif kind == "active_planning_intent":
             topic = payload.get("intent_topic", "the update").replace("_", " ")
-            body = f"Got it, {salutation}. I've drafted the {topic} strategy optimized for your {location} audience. I'm ready to push this to GBP to start driving leads. Shall we go live?"
+            body = f"Got it, {salutation}. I've drafted the {topic} strategy optimized for your {location} audience. {voice_intro} I'm ready to push this{lang_note} to GBP to start driving leads and boost your {ctr:.3f} CTR. Shall we go live?"
             cta = "Go Live with Strategy"
             rationale = "Intent-to-action handoff."
 
         else:
-            body = f"Growth opportunity: {m_name} is appearing in {views} searches, but your CTR is {ctr:.3f}. A {active_offer} targeted at {location} searches can improve your ranking vs peers ({peer_ctr:.3f}). Ready to start?"
-            cta = "Ready?"
-            rationale = "Generic performance nudge with peer benchmarking."
+            fallback_hook = "You're leaving money on the table." if ctr < peer_ctr else "Let's double down on this momentum."
+            body = f"Growth Update: {salutation}, {m_name} has generated {views} searches, but {fallback_hook} {voice_intro} activating your '{active_offer}'{lang_note} in {location} right now will actively capture those leads before they drop off. Shall I proceed?"
+            cta = "Activate Growth Plan"
+            rationale = "Dynamic catch-all fallback using active metrics and loss aversion."
 
         return {
             "action": "send",
@@ -174,12 +239,18 @@ class MessageCompositionEngine:
         c_identity = customer.get("identity", {})
         c_name = c_identity.get("name", "there")
         
-        # Get active offer
+        # Active offer
         offers = merchant.get("offers", [])
-        active_offer = next((o.get("title") for o in offers if o.get("status") == "active"), None)
+        if not isinstance(offers, list):
+            offers = []
+        active_offer = next((o.get("title") for o in offers if isinstance(o, dict) and o.get("status") == "active"), None)
+        
+        if not active_offer:
+            active_offer = merchant.get("offer")
+            
         if not active_offer:
             catalog = category.get("offer_catalog", [])
-            active_offer = catalog[0].get("title") if catalog else "our latest services"
+            active_offer = catalog[0].get("title") if isinstance(catalog, list) and catalog else "our latest services"
 
         body = ""
         cta = "Confirm"
@@ -200,9 +271,9 @@ class MessageCompositionEngine:
             rationale = "Conversion from trial to paid."
 
         else:
-            body = f"Hi {c_name}, special update from {m_name}. Check out our {active_offer} available now in your locality!"
-            cta = "View Offer"
-            rationale = "Generic customer re-engagement."
+            body = f"Hi {c_name}, special update from {m_name}. We're running a limited-time '{active_offer}' just for our locals in {m_identity.get('locality', 'the area')}. Slots are filling up fast! Want to claim it before it expires?"
+            cta = "Claim Offer Now"
+            rationale = "Customer re-engagement with FOMO and urgency."
 
         return {
             "action": "send",

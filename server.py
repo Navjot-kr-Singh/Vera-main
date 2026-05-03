@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 from message_engine import MessageCompositionEngine
@@ -92,8 +92,7 @@ class ReplyRequest(BaseModel):
     from_role: Optional[str] = "merchant"
     context: Optional[Dict[str, Any]] = None
 
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(extra="allow")
 
 @app.get("/v1/healthz")
 async def healthz():
@@ -114,11 +113,19 @@ async def push_context(data: Dict[str, Any]):
         payload = data.get("payload")
         version = data.get("version", 0)
         
+        # Fallback for manual cURL testing
+        if not scope and "merchant" in data:
+            scope = "merchant"
+            context_id = data.get("merchant_id", "m_unknown")
+            payload = data.get("merchant")
+            if "category" in data and "category_slug" not in payload:
+                payload["category_slug"] = data.get("category")
+        
         if not all([scope, context_id, payload]):
             return JSONResponse(status_code=422, content={"error": "Missing required fields in context"})
 
         updated = state.upsert_context(scope, context_id, payload, version)
-        return {"accepted": True, "updated": updated}
+        return {"accepted": True, "updated": updated, "status": "context_received"}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
@@ -132,6 +139,9 @@ async def tick(request: Request):
             available_triggers = raw_body
         elif isinstance(raw_body, dict):
             available_triggers = raw_body.get("available_triggers", [])
+            # Fallback for manual cURL testing
+            if not available_triggers and raw_body.get("trigger"):
+                available_triggers = [raw_body.get("trigger")]
         else:
             return {"actions": []}
         
@@ -145,8 +155,18 @@ async def tick(request: Request):
                 # -----------------------------
                 # SYNTHETIC FALLBACK (90+ LEVEL)
                 # -----------------------------
-                known_kinds = ["search_surge", "perf_dip", "conversion_drop", "perf_spike", "festival_upcoming", "milestone_reached"]
-                if any(k in tid.lower() for k in known_kinds):
+                known_kinds = ["search_surge", "perf_dip", "conversion_drop", "perf_spike", "festival_upcoming", "milestone_reached", "weekend", "lunch_time", "payday", "rain", "low_sales"]
+                # If they manually passed a trigger and merchant_id in the payload, use it!
+                if raw_body.get("merchant_id"):
+                    kind = tid
+                    mid = raw_body.get("merchant_id")
+                    trigger = {
+                        "id": tid,
+                        "kind": kind,
+                        "merchant_id": mid,
+                        "payload": {"keyword": kind}
+                    }
+                elif any(k in tid.lower() for k in known_kinds):
                     kind = tid if tid in known_kinds else "search_surge"
                     if "conversion" in tid.lower() or "drop" in tid.lower(): kind = "perf_dip"
                     
@@ -171,17 +191,24 @@ async def tick(request: Request):
                 else:
                     continue
             
-            mid = trigger.get("merchant_id") or trigger.get("payload", {}).get("merchant_id")
+            mid = trigger.get("merchant_id") or trigger.get("payload", {}).get("merchant_id") or (isinstance(raw_body, dict) and raw_body.get("merchant_id"))
             if not mid:
                 continue
             
             merchant = state.get_merchant(mid)
-            if not merchant or not merchant.get("merchant_id"):
+            if not merchant:
                 continue
             
+            # Ensure merchant has merchant_id for message_engine
+            if "merchant_id" not in merchant:
+                merchant["merchant_id"] = mid
+            
             category_slug = merchant.get("category_slug")
+            # Fallback for manual cURL tests where category might not be perfectly nested
+            if not category_slug and isinstance(raw_body, dict):
+                category_slug = raw_body.get("category", "business")
             if not category_slug:
-                continue
+                category_slug = "business"
             
             customer_id = trigger.get("customer_id")
             customer = state.get_customer(customer_id) if customer_id else None
@@ -234,9 +261,6 @@ async def handle_reply(request: Request):
             + str(body.get("text") or "")
         ).lower().strip()
 
-        # Record message for auto-reply detection
-        state.record_message(mid, conv_id, text)
-
         # -----------------------------
         # SAFETY / EMPTY CHECK
         # -----------------------------
@@ -247,20 +271,29 @@ async def handle_reply(request: Request):
         # AUTO-REPLY DETECTION (WAIT THEN END)
         # -----------------------------
         auto_reply_keywords = [
-            "busy", "meeting", "out of office", "away",
-            "call you later", "driving", "will get back",
-            "unavailable", "not available", "later",
-            "auto", "automatic", "respond later",
-            "cant talk", "cannot talk", "right now",
-            "in a call", "occupied", "shortly",
-            "contacting us", "team will", "automated assistant"
+            "out of office", "automated assistant", "contacting us", "team will",
+            "auto-reply", "system message", "noreply", "no-reply",
+            "will respond shortly", "currently unavailable to take your message"
         ]
 
+        history = state.data.get("merchant_history", {}).get(mid, [])
+        
+        # Check if the last message (before this one) was also an auto-reply
+        prev_was_auto = False
+        if len(history) >= 1:
+            prev_msg = history[-1]["message"]
+            prev_was_auto = any(k in prev_msg for k in auto_reply_keywords)
+
         is_keyword_match = any(k in text for k in auto_reply_keywords)
+        from_role = body.get("from_role", "merchant")
+
+        # Record message AFTER checking previous history
+        state.record_message(mid, conv_id, text)
         streak = state.get_auto_reply_streak(mid, text)
 
-        if is_keyword_match or state.is_auto_reply(mid, text):
-            if streak >= 2:
+        # NEVER trigger auto-reply on customer messages
+        if is_keyword_match and from_role == "merchant":
+            if prev_was_auto or streak >= 2:
                 return {"action": "end"}
             else:
                 return {"action": "wait", "wait_seconds": 60}
@@ -275,11 +308,37 @@ async def handle_reply(request: Request):
             return {"action": "end"}
 
         # -----------------------------
-        # POSITIVE INTENT
+        # POSITIVE INTENT & CUSTOMER SLOT PICK
         # -----------------------------
-        if any(k in text for k in [
-            "ok", "yes", "do it", "go ahead", "lets do it", "proceed", "agree"
-        ]):
+        is_positive = any(k in text for k in [
+            "ok", "yes", "do it", "go ahead", "lets do it", "proceed", "agree", "book", "1", "2"
+        ])
+
+        if from_role == "customer":
+            if is_positive or "slot" in text or "pm" in text or "am" in text or "time" in text:
+                msg = safe_str("Great! I've booked your slot. We look forward to seeing you.")
+                return {
+                    "action": "send",
+                    "body": msg,
+                    "message": msg,
+                    "cta": "Confirmed",
+                    "send_as": "merchant_on_behalf",
+                    "suppression_key": "customer_confirm",
+                    "rationale": "Customer slot pick confirmed"
+                }
+            else:
+                fallback_msg = safe_str("Thank you for your message. I'll make a note of it!")
+                return {
+                    "action": "send",
+                    "body": fallback_msg,
+                    "message": fallback_msg,
+                    "cta": "Noted",
+                    "send_as": "merchant_on_behalf",
+                    "suppression_key": "customer_fallback",
+                    "rationale": "Context-aware customer fallback response"
+                }
+            
+        if is_positive:
             msg = safe_str("Great — I’ll set this up. I am proceeding with the confirmed update for your business now.")
             return {
                 "action": "send",
@@ -292,24 +351,9 @@ async def handle_reply(request: Request):
             }
 
         # -----------------------------
-        # ECHOING FALLBACK
+        # MERCHANT FALLBACK
         # -----------------------------
-        echo_word = ""
-        # Technical or specific words are better
-        words = [w.strip("?,.!") for w in text.split()]
-        specific_words = [w for w in words if len(w) > 3 and w not in auto_reply_keywords and w not in [
-            "hello", "there", "please", "thanks", "thank", " Vera", "vera", "assistant"
-        ]]
-        
-        if specific_words:
-            # Try to find a very specific word (e.g. capitalized in original, or long)
-            echo_word = max(specific_words, key=len)
-        
-        if echo_word:
-            fallback_msg = safe_str(f"I understand your interest in {echo_word}. Let me refine this recommendation based on your business profile.")
-        else:
-            fallback_msg = safe_str("Let me refine this recommendation based on your business profile.")
-
+        fallback_msg = safe_str("I’ll help you boost your sales with targeted campaigns and better offers. Let’s get started.")
         return {
             "action": "send",
             "body": fallback_msg,
@@ -321,8 +365,10 @@ async def handle_reply(request: Request):
         }
 
     except Exception as e:
-        # ABSOLUTE SAFETY NET
-        return {"action": "end"}
+        print(f"Exception in handle_reply: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"action": "end", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

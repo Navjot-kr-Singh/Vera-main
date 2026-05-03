@@ -164,6 +164,8 @@ class StateManager:
         return streak
 
     def is_auto_reply(self, mid: str, message: str) -> bool:
+        if len(message) < 15:
+            return False
         history = self.data["merchant_history"].get(mid, [])
         if not history:
             return False

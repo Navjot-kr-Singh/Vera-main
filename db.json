@@ -1510,6 +1510,15 @@
           "occurrences_30d": 8
         }
       ]
+    },
+    "m_001": {
+      "name": "Pizza Hub",
+      "offer": "20% OFF",
+      "performance": "low_sales",
+      "city": "Delhi",
+      "language": "en",
+      "category_slug": "restaurant",
+      "merchant_id": "m_001"
     }
   },
   "customers": {},
@@ -1524,148 +1533,147 @@
     "merchant:m_002_bharat_dentist_mumbai": 1,
     "merchant:m_003_studio11_salon_hyderabad": 1,
     "merchant:m_004_glamour_salon_pune": 1,
-    "merchant:m_005_pizzajunction_restaurant_delhi": 1
+    "merchant:m_005_pizzajunction_restaurant_delhi": 1,
+    "merchant:m_001": 0
   },
   "suppression": {},
   "conversations": {
     "conv_auto_1": [
       {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615824.830666
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615865.154654
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615987.5193
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777616034.40341
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777616129.838597
+        "message": "thank you for contacting us! our team will respond shortly.",
+        "timestamp": 1777815943.3691351
       }
     ],
     "conv_auto_2": [
       {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615824.8334131
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615865.1581619
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777616034.40866
-      }
-    ],
-    "conv_auto_3": [
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615824.8359091
-      },
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615865.1606789
-      }
-    ],
-    "conv_auto_4": [
-      {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615824.8383129
+        "message": "thank you for contacting us! our team will respond shortly.",
+        "timestamp": 1777815943.371834
       }
     ],
     "conv_intent_1": [
       {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777615824.841609
-      },
-      {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777615865.164122
-      },
-      {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777615987.523489
-      },
-      {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777616034.415318
-      },
-      {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777616129.843775
+        "message": "ok lets do it. whats next?",
+        "timestamp": 1777815943.374869
       }
     ],
     "conv_hostile": [
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777615824.8447528
+        "message": "stop messaging me. this is useless spam.",
+        "timestamp": 1777815943.3786082
+      }
+    ],
+    "c_unknown": [
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777816942.1668391
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777615865.167519
+        "message": "stop",
+        "timestamp": 1777816949.1335769
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777615987.5277681
+        "message": "book me tomorrow at 6pm",
+        "timestamp": 1777817524.354984
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777616034.4190452
+        "message": "i need help with sales",
+        "timestamp": 1777817532.001717
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777616129.851889
+        "message": "stop",
+        "timestamp": 1777817546.137186
+      },
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777817659.401533
+      },
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777817659.421293
+      },
+      {
+        "message": "book me tomorrow at 6pm",
+        "timestamp": 1777817836.451475
+      },
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777817844.275636
+      },
+      {
+        "message": "stop",
+        "timestamp": 1777817853.6173089
       }
     ]
   },
   "merchant_history": {
     "m_001_drmeera_dentist_delhi": [
       {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777615987.5193028
+        "message": "thank you for contacting us! our team will respond shortly.",
+        "timestamp": 1777815943.3691368
       },
       {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777615987.52349
+        "message": "thank you for contacting us! our team will respond shortly.",
+        "timestamp": 1777815943.371835
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777615987.527769
+        "message": "ok lets do it. whats next?",
+        "timestamp": 1777815943.374869
       },
       {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777616034.403411
+        "message": "stop messaging me. this is useless spam.",
+        "timestamp": 1777815943.3786082
+      }
+    ],
+    "m_unknown": [
+      {
+        "message": "stop",
+        "timestamp": 1777816216.765801
       },
       {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777616034.408661
+        "message": "book me tomorrow at 6pm",
+        "timestamp": 1777816934.916613
       },
       {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777616034.4153202
+        "message": "i need help with sales",
+        "timestamp": 1777816942.1668422
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777616034.4190469
+        "message": "stop",
+        "timestamp": 1777816949.13358
       },
       {
-        "message": "Thank you for contacting us! Our team will respond shortly.",
-        "timestamp": 1777616129.8385978
+        "message": "book me tomorrow at 6pm",
+        "timestamp": 1777817524.354998
       },
       {
-        "message": "Ok lets do it. Whats next?",
-        "timestamp": 1777616129.843777
+        "message": "i need help with sales",
+        "timestamp": 1777817532.0017228
       },
       {
-        "message": "Stop messaging me. This is useless spam.",
-        "timestamp": 1777616129.851893
+        "message": "stop",
+        "timestamp": 1777817546.137196
+      },
+      {
+        "message": "book me tomorrow at 6pm",
+        "timestamp": 1777817836.4514859
+      },
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777817844.275645
+      },
+      {
+        "message": "stop",
+        "timestamp": 1777817853.617312
+      }
+    ],
+    "m_test123": [
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777817659.401535
+      },
+      {
+        "message": "i need help with sales",
+        "timestamp": 1777817659.4212952
       }
     ]
   }
