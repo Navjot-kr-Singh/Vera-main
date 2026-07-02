@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import threading
 from typing import Dict, Any, Optional
 
 # Define bundled and persistent paths
@@ -24,7 +25,10 @@ class StateManager:
     with versioning and suppression tracking.
     """
     def __init__(self):
-        self.data = self._load()
+        self._lock = threading.RLock()
+        self.start_time = time.time()
+        with self._lock:
+            self.data = self._load_unlocked()
         if "versions" not in self.data:
             self.data["versions"] = {}
         if "suppression" not in self.data:
@@ -34,7 +38,7 @@ class StateManager:
         if "merchant_history" not in self.data:
             self.data["merchant_history"] = {} # key: mid, value: list of messages
 
-    def _load(self):
+    def _load_unlocked(self):
         if os.path.exists(DB_FILE):
             try:
                 with open(DB_FILE, "r") as f:
@@ -51,125 +55,148 @@ class StateManager:
         }
 
     def save(self):
-        with open(DB_FILE, "w") as f:
-            json.dump(self.data, f, indent=2)
+        with self._lock:
+            with open(DB_FILE, "w") as f:
+                json.dump(self.data, f, indent=2)
 
-    def upsert_context(self, scope: str, context_id: str, payload: Dict[str, Any], version: int = 0):
+    def get_context_counts(self) -> Dict[str, int]:
+        with self._lock:
+            return {
+                "category": len(self.data.get("categories", {})),
+                "merchant": len(self.data.get("merchants", {})),
+                "customer": len(self.data.get("customers", {})),
+                "trigger": len(self.data.get("triggers", {}))
+            }
+
+    def upsert_context(self, scope: str, context_id: str, payload: Dict[str, Any], version: int = 0) -> str:
         """
         Idempotent: same version = no-op. Higher version replaces.
+        Returns: "updated", "duplicate", or "stale".
         """
-        try:
-            v_key = f"{scope}:{context_id}"
-            current_v = self.data["versions"].get(v_key, -1)
+        with self._lock:
+            try:
+                v_key = f"{scope}:{context_id}"
+                current_v = self.data["versions"].get(v_key, -1)
 
-            if version <= current_v:
-                return False # No-op
+                if version < current_v:
+                    return "stale"
+                if version == current_v:
+                    return "duplicate"
 
-            if scope == "category":
-                self.data["categories"][context_id] = payload
-            elif scope == "merchant":
-                # Ensure merchant_id is consistent
-                mid = payload.get("merchant_id", context_id)
-                self.data["merchants"][mid] = payload
-            elif scope == "customer":
-                cid = payload.get("customer_id", context_id)
-                self.data["customers"][cid] = payload
-            elif scope == "trigger":
-                tid = payload.get("id", context_id)
-                self.data["triggers"][tid] = payload
-            else:
-                # Generic scope handling
-                if scope + "s" not in self.data:
-                    self.data[scope + "s"] = {}
-                self.data[scope + "s"][context_id] = payload
-            
-            self.data["versions"][v_key] = version
-            self.save()
-            return True
-        except Exception as e:
-            print(f"Upsert error: {e}")
-            raise e
+
+                if scope == "category":
+                    self.data["categories"][context_id] = payload
+                elif scope == "merchant":
+                    # Ensure merchant_id is consistent
+                    mid = payload.get("merchant_id", context_id)
+                    self.data["merchants"][mid] = payload
+                elif scope == "customer":
+                    cid = payload.get("customer_id", context_id)
+                    self.data["customers"][cid] = payload
+                elif scope == "trigger":
+                    tid = payload.get("id", context_id)
+                    self.data["triggers"][tid] = payload
+                else:
+                    # Generic scope handling
+                    if scope + "s" not in self.data:
+                        self.data[scope + "s"] = {}
+                    self.data[scope + "s"][context_id] = payload
+                
+                self.data["versions"][v_key] = version
+                self.save()
+                return "updated"
+            except Exception as e:
+                print(f"Upsert error: {e}")
+                raise e
 
     def get_category(self, slug):
-        return self.data["categories"].get(slug, {})
+        with self._lock:
+            return self.data["categories"].get(slug, {})
 
     def get_merchant(self, mid):
-        return self.data["merchants"].get(mid, {})
+        with self._lock:
+            return self.data["merchants"].get(mid, {})
 
     def get_customer(self, cid):
-        return self.data["customers"].get(cid, {})
+        with self._lock:
+            return self.data["customers"].get(cid, {})
 
     def get_trigger(self, tid):
-        return self.data["triggers"].get(tid, {})
+        with self._lock:
+            return self.data["triggers"].get(tid, {})
 
     def is_suppressed(self, key: str, intent: str) -> bool:
         """
         Check if the same strategy was used within 6 hours.
         """
-        import time
-        supp_data = self.data["suppression"].get(key)
-        if not supp_data:
-            return False
+        with self._lock:
+            supp_data = self.data["suppression"].get(key)
+            if not supp_data:
+                return False
+                
+            last_intent = supp_data.get("intent")
+            last_time = supp_data.get("timestamp", 0)
             
-        last_intent = supp_data.get("intent")
-        last_time = supp_data.get("timestamp", 0)
-        
-        # 6 hours = 6 * 3600 seconds
-        is_recent = (time.time() - last_time) < (6 * 3600)
-        
-        return last_intent == intent and is_recent
+            # 6 hours = 6 * 3600 seconds
+            is_recent = (time.time() - last_time) < (6 * 3600)
+            
+            return last_intent == intent and is_recent
 
     def update_suppression(self, key: str, intent: str):
-        import time
-        self.data["suppression"][key] = {
-            "intent": intent,
-            "timestamp": time.time()
-        }
-        self.save()
-
-    def clear_suppression(self, key: str):
-        if key in self.data["suppression"]:
-            del self.data["suppression"][key]
+        with self._lock:
+            self.data["suppression"][key] = {
+                "intent": intent,
+                "timestamp": time.time()
+            }
             self.save()
 
+    def clear_suppression(self, key: str):
+        with self._lock:
+            if key in self.data["suppression"]:
+                del self.data["suppression"][key]
+                self.save()
+
     def record_message(self, mid: str, conv_id: str, message: str):
-        # Per conversation history
-        if conv_id not in self.data["conversations"]:
-            self.data["conversations"][conv_id] = []
-        self.data["conversations"][conv_id].append({
-            "message": message,
-            "timestamp": time.time()
-        })
-        self.data["conversations"][conv_id] = self.data["conversations"][conv_id][-10:]
-        
-        # Global merchant history (for auto-reply detection)
-        if mid not in self.data["merchant_history"]:
-            self.data["merchant_history"][mid] = []
-        self.data["merchant_history"][mid].append({
-            "message": message,
-            "timestamp": time.time()
-        })
-        self.data["merchant_history"][mid] = self.data["merchant_history"][mid][-10:]
-        
-        self.save()
+        with self._lock:
+            # Per conversation history
+            if conv_id not in self.data["conversations"]:
+                self.data["conversations"][conv_id] = []
+            self.data["conversations"][conv_id].append({
+                "message": message,
+                "timestamp": time.time()
+            })
+            self.data["conversations"][conv_id] = self.data["conversations"][conv_id][-10:]
+            
+            # Global merchant history (for auto-reply detection)
+            if mid not in self.data["merchant_history"]:
+                self.data["merchant_history"][mid] = []
+            self.data["merchant_history"][mid].append({
+                "message": message,
+                "timestamp": time.time()
+            })
+            self.data["merchant_history"][mid] = self.data["merchant_history"][mid][-10:]
+            
+            self.save()
 
     def get_auto_reply_streak(self, mid: str, message: str) -> int:
-        history = self.data["merchant_history"].get(mid, [])
-        streak = 0
-        for item in reversed(history):
-            if item["message"] == message:
-                streak += 1
-            else:
-                break
-        return streak
+        with self._lock:
+            history = self.data["merchant_history"].get(mid, [])
+            streak = 0
+            for item in reversed(history):
+                if item["message"] == message:
+                    streak += 1
+                else:
+                    break
+            return streak
 
     def is_auto_reply(self, mid: str, message: str) -> bool:
-        if len(message) < 15:
-            return False
-        history = self.data["merchant_history"].get(mid, [])
-        if not history:
-            return False
-        
-        # If the same message appears 2+ times in last 5 messages, it's likely an auto-reply
-        count = sum(1 for item in history[-5:] if item["message"] == message)
-        return count >= 2
+        with self._lock:
+            if len(message) < 15:
+                return False
+            history = self.data["merchant_history"].get(mid, [])
+            if not history:
+                return False
+            
+            # If the same message appears 2+ times in last 5 messages, it's likely an auto-reply
+            count = sum(1 for item in history[-5:] if item["message"] == message)
+            return count >= 2

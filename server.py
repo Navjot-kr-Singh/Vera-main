@@ -1,4 +1,5 @@
 import os
+import time
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from dotenv import load_dotenv
 from message_engine import MessageCompositionEngine
 from state_manager import StateManager
-from datetime import datetime
+from datetime import datetime, timezone
 
 load_dotenv()
 
@@ -96,13 +97,24 @@ class ReplyRequest(BaseModel):
 
 @app.get("/v1/healthz")
 async def healthz():
-    return {"status": "ok"}
+    uptime = int(time.time() - state.start_time)
+    counts = state.get_context_counts()
+    return {
+        "status": "ok",
+        "uptime_seconds": uptime,
+        "contexts_loaded": counts
+    }
 
 @app.get("/v1/metadata")
 async def metadata():
     return {
         "team_name": "Navjot Singh",
-        "model": "Deterministic Decision Engine v2"
+        "team_members": ["Navjot Singh"],
+        "model": "Deterministic Decision Engine v2",
+        "approach": "Hybrid rule-based specific content matching engine",
+        "contact_email": "navjotsingh@magicpin.com",
+        "version": "2.1.0",
+        "submitted_at": "2026-07-02T13:00:00Z"
     }
 
 @app.post("/v1/context")
@@ -111,21 +123,34 @@ async def push_context(data: Dict[str, Any]):
         scope = data.get("scope")
         context_id = data.get("context_id")
         payload = data.get("payload")
-        version = data.get("version", 0)
+        version = data.get("version")
         
-        # Fallback for manual cURL testing
-        if not scope and "merchant" in data:
-            scope = "merchant"
-            context_id = data.get("merchant_id", "m_unknown")
-            payload = data.get("merchant")
-            if "category" in data and "category_slug" not in payload:
-                payload["category_slug"] = data.get("category")
-        
-        if not all([scope, context_id, payload]):
-            return JSONResponse(status_code=422, content={"error": "Missing required fields in context"})
+        # Validation for required fields
+        if scope is None or context_id is None or payload is None or version is None:
+            return JSONResponse(
+                status_code=400,
+                content={"accepted": False, "reason": "invalid_payload", "details": "Missing required fields"}
+            )
+            
+        if scope not in ["category", "merchant", "customer", "trigger"]:
+            return JSONResponse(
+                status_code=400,
+                content={"accepted": False, "reason": "invalid_scope", "details": f"Scope '{scope}' is invalid"}
+            )
 
-        updated = state.upsert_context(scope, context_id, payload, version)
-        return {"accepted": True, "updated": updated, "status": "context_received"}
+        res = state.upsert_context(scope, context_id, payload, version)
+        
+        if res in ("stale", "duplicate"):
+            current_v = state.data["versions"].get(f"{scope}:{context_id}", -1)
+            return JSONResponse(
+                status_code=409,
+                content={"accepted": False, "reason": "stale_version", "current_version": current_v}
+            )
+            
+        ack_id = f"ack_{context_id}_v{version}"
+        stored_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        return {"accepted": True, "ack_id": ack_id, "stored_at": stored_at}
+        
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
 
@@ -194,6 +219,9 @@ async def tick(request: Request):
             mid = trigger.get("merchant_id") or trigger.get("payload", {}).get("merchant_id") or (isinstance(raw_body, dict) and raw_body.get("merchant_id"))
             if not mid:
                 continue
+                
+            if state.is_suppressed(mid, "hostile"):
+                continue
             
             merchant = state.get_merchant(mid)
             if not merchant:
@@ -217,16 +245,37 @@ async def tick(request: Request):
             category = state.get_category(category_slug)
             res = engine.compose(category, merchant, trigger, customer)
             
+            supp_key = res.get("suppression_key")
+            if supp_key and state.is_suppressed(f"{mid}:{supp_key}", trigger.get("kind", "generic")):
+                continue
+                
+            if supp_key:
+                state.update_suppression(f"{mid}:{supp_key}", trigger.get("kind", "generic"))
+            
+            
+            raw_body = str(res.get("body", ""))
+            if len(raw_body) > 320:
+                cut_idx = raw_body.rfind(" ", 0, 317)
+                if cut_idx == -1:
+                    cut_idx = 317
+                raw_body = raw_body[:cut_idx].strip() + "..."
+
             # Action schema
             action = {
-                "type": "engage",
+                "conversation_id": f"conv_{mid}_{tid}",
                 "merchant_id": mid,
-                "trigger_id": tid,
-                "body": str(res.get("body", "")),
-                "message": str(res.get("body", "")), 
-                "cta": str(res.get("cta", "See details")),
+                "customer_id": customer_id if customer_id else None,
                 "send_as": str(res.get("send_as", "vera")),
-                "suppression_key": str(res.get("suppression_key", "")),
+                "trigger_id": tid,
+                "template_name": f"vera_{trigger.get('kind', 'generic')}_v1",
+                "template_params": [
+                    str(merchant.get("identity", {}).get("name", "Merchant")),
+                    str(res.get("cta", "See details")),
+                    ""
+                ],
+                "body": raw_body,
+                "cta": str(res.get("cta", "See details")),
+                "suppression_key": str(supp_key or ""),
                 "rationale": str(res.get("rationale", ""))
             }
             actions.append(action)
@@ -294,9 +343,9 @@ async def handle_reply(request: Request):
         # NEVER trigger auto-reply on customer messages
         if is_keyword_match and from_role == "merchant":
             if prev_was_auto or streak >= 2:
-                return {"action": "end"}
+                return {"action": "end", "rationale": "Exceeded auto-reply threshold"}
             else:
-                return {"action": "wait", "wait_seconds": 60}
+                return {"action": "wait", "wait_seconds": 60, "rationale": "Waiting to bypass auto-reply"}
 
         # -----------------------------
         # HOSTILE
@@ -305,7 +354,8 @@ async def handle_reply(request: Request):
             "stop", "spam", "useless", "not interested",
             "don't message", "leave me"
         ]):
-            return {"action": "end"}
+            state.update_suppression(mid, "hostile")
+            return {"action": "end", "rationale": "Merchant requested stop / hostile tone"}
 
         # -----------------------------
         # POSITIVE INTENT & CUSTOMER SLOT PICK
@@ -320,10 +370,7 @@ async def handle_reply(request: Request):
                 return {
                     "action": "send",
                     "body": msg,
-                    "message": msg,
                     "cta": "Confirmed",
-                    "send_as": "merchant_on_behalf",
-                    "suppression_key": "customer_confirm",
                     "rationale": "Customer slot pick confirmed"
                 }
             else:
@@ -331,10 +378,7 @@ async def handle_reply(request: Request):
                 return {
                     "action": "send",
                     "body": fallback_msg,
-                    "message": fallback_msg,
                     "cta": "Noted",
-                    "send_as": "merchant_on_behalf",
-                    "suppression_key": "customer_fallback",
                     "rationale": "Context-aware customer fallback response"
                 }
             
@@ -343,10 +387,7 @@ async def handle_reply(request: Request):
             return {
                 "action": "send",
                 "body": msg,
-                "message": msg,
                 "cta": "Confirm",
-                "send_as": "assistant",
-                "suppression_key": "confirm_campaign",
                 "rationale": "Merchant intent detected → moving to execution step"
             }
 
@@ -357,10 +398,7 @@ async def handle_reply(request: Request):
         return {
             "action": "send",
             "body": fallback_msg,
-            "message": fallback_msg,
             "cta": "See Details",
-            "send_as": "assistant",
-            "suppression_key": "refine",
             "rationale": "Context-aware fallback response"
         }
 
@@ -368,7 +406,20 @@ async def handle_reply(request: Request):
         print(f"Exception in handle_reply: {e}")
         import traceback
         traceback.print_exc()
-        return {"action": "end", "error": str(e)}
+        return {"action": "end", "rationale": f"Internal exception: {str(e)}"}
+
+@app.post("/v1/reset")
+async def reset_state():
+    state.data["suppression"] = {}
+    state.data["conversations"] = {}
+    state.data["merchant_history"] = {}
+    state.data["versions"] = {}
+    state.data["categories"] = {}
+    state.data["merchants"] = {}
+    state.data["customers"] = {}
+    state.data["triggers"] = {}
+    state.save()
+    return {"status": "reset"}
 
 if __name__ == "__main__":
     import uvicorn
